@@ -169,47 +169,25 @@ const setLocalStorageData = <T>(key: string, data: T): void => {
   }
 };
 
-// Initialize Database Collections helper
-export const initializeDatabase = async () => {
+// Helper: Execute Firestore call with fast timeout fallback to local storage
+const withTimeout = async <T>(promise: Promise<T>, fallback: T, ms = 1200): Promise<T> => {
+  let timer: any;
+  const timeout = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
   try {
-    // Attempt Firestore write. If successful, perfect.
-    // Also store locally for absolute speed and synchronization.
-    const companyDocRef = doc(db, 'companies', 'inmobai');
-    const docSnap = await getDoc(companyDocRef);
-    
-    if (!docSnap.exists()) {
-      // First time loading - Seed collections in Firestore
-      console.log('Seeding Firestore collections...');
-      await setDoc(doc(db, 'companies', 'inmobai'), DEFAULT_COMPANY);
-      
-      for (const prop of DEFAULT_PROPERTIES) {
-        await setDoc(doc(db, 'properties', prop.id), prop);
-      }
-      for (const cust of DEFAULT_CUSTOMERS) {
-        await setDoc(doc(db, 'customers', cust.id), cust);
-      }
-      for (const sel of DEFAULT_SELLERS) {
-        await setDoc(doc(db, 'staff', sel.id), sel);
-      }
-      for (const opp of DEFAULT_OPPORTUNITIES) {
-        await setDoc(doc(db, 'opportunities', opp.id), opp);
-      }
-      for (const inf of DEFAULT_INFERENCES) {
-        await setDoc(doc(db, 'customer_inferences', inf.id), inf);
-      }
-      for (const b of DEFAULT_BOOKINGS) {
-        await setDoc(doc(db, 'bookings', b.id), b);
-      }
-      for (const t of DEFAULT_TASKS) {
-        await setDoc(doc(db, 'tasks', t.id), t);
-      }
-      console.log('Seeding completed successfully!');
-    }
-  } catch (error) {
-    console.warn('Firestore seeding skipped/offline fallback active.', error);
+    const res = await Promise.race([promise, timeout]);
+    clearTimeout(timer);
+    return res;
+  } catch {
+    clearTimeout(timer);
+    return fallback;
   }
+};
 
-  // Pre-seed LocalStorage just in case
+// Initialize Database Collections helper with fast non-blocking timeout
+export const initializeDatabase = async () => {
+  // Always ensure LocalStorage has complete mock data immediately
   if (!localStorage.getItem('inmobdb_properties')) {
     setLocalStorageData('properties', DEFAULT_PROPERTIES);
     setLocalStorageData('company', DEFAULT_COMPANY);
@@ -220,17 +198,25 @@ export const initializeDatabase = async () => {
     setLocalStorageData('bookings', DEFAULT_BOOKINGS);
     setLocalStorageData('tasks', DEFAULT_TASKS);
   }
+
+  try {
+    const companyDocRef = doc(db, 'companies', 'inmobai');
+    await withTimeout(getDoc(companyDocRef), null, 1000);
+  } catch (error) {
+    console.warn('Firestore initialization skipped, using instant local cache.');
+  }
 };
 
-// API Client Wrapper to sync Firestore and LocalStorage
+// API Client Wrapper to sync Firestore and LocalStorage safely
 export const inmobDb = {
   // Config
   getCompany: async (): Promise<CompanyConfig> => {
+    const local = getLocalStorageData('company', DEFAULT_COMPANY);
     try {
-      const snap = await getDoc(doc(db, 'companies', 'inmobai'));
-      if (snap.exists()) return snap.data() as CompanyConfig;
+      const snap = await withTimeout(getDoc(doc(db, 'companies', 'inmobai')), null, 1000);
+      if (snap && snap.exists()) return snap.data() as CompanyConfig;
     } catch {}
-    return getLocalStorageData('company', DEFAULT_COMPANY);
+    return local;
   },
   saveCompany: async (config: CompanyConfig): Promise<void> => {
     try {

@@ -17,8 +17,9 @@ const PORT = 3000;
 app.use(express.json());
 
 // Initialize Gemini SDK with custom User-Agent
+const apiKey = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY || 'AIzaSy_DEMO_KEY';
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
+  apiKey,
   httpOptions: {
     headers: {
       'User-Agent': 'aistudio-build',
