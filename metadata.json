@@ -1,0 +1,6 @@
+{
+  "name": "InmobAI",
+  "description": "Plataforma de aluguel de imóveis de luxo por temporada em Trancoso e Arraial d'ajuda, com assessoria de agente de inteligência artificial de última geração e CRM integrado.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
