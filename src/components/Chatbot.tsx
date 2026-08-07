@@ -15,6 +15,8 @@ interface ChatbotProps {
   agentInstruction: string;
   onBookProperty: (prop: Property, dates: { start: string; end: string }) => void;
   onAddInference: (inf: any) => void;
+  customerProfile?: any;
+  onUpdateCustomerProfile?: (updated: any) => void;
 }
 
 export default function Chatbot({
@@ -23,7 +25,9 @@ export default function Chatbot({
   agentAvatar,
   agentInstruction,
   onBookProperty,
-  onAddInference
+  onAddInference,
+  customerProfile,
+  onUpdateCustomerProfile
 }: ChatbotProps) {
   
   const [messages, setMessages] = useState<Message[]>([
@@ -68,34 +72,23 @@ export default function Chatbot({
     ]);
   };
 
-  // Convert text to speech using gemini-3.1-flash-tts-preview with robust client-side fallback
+  // Convert text to speech using gemini-3.1-flash-tts-preview with robust WAV audio decoding
   const speakMessage = async (msgId: string, text: string) => {
     if (playingAudioMsgId === msgId) {
-      // Toggle stop
       setPlayingAudioMsgId(null);
-      
-      // Stop Gemini AudioContext source if active
       if (currentSourceRef.current) {
-        try {
-          currentSourceRef.current.stop();
-        } catch (err) {
-          // ignore if already stopped
-        }
+        try { currentSourceRef.current.stop(); } catch (err) {}
         currentSourceRef.current = null;
       }
-      
-      // Stop SpeechSynthesis if active
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
       return;
     }
 
-    // Stop previous playbacks
+    // Stop previous audio playback
     if (currentSourceRef.current) {
-      try {
-        currentSourceRef.current.stop();
-      } catch (err) {}
+      try { currentSourceRef.current.stop(); } catch (err) {}
       currentSourceRef.current = null;
     }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -118,19 +111,25 @@ export default function Chatbot({
       const data = await response.json();
       
       if (data.audio) {
-        // Decode base64 to arraybuffer and play
-        const audioData = atob(data.audio);
-        const arrayBuffer = new ArrayBuffer(audioData.length);
-        const view = new Uint8Array(arrayBuffer);
-        for (let i = 0; i < audioData.length; i++) {
-          view[i] = audioData.charCodeAt(i);
+        // Decode base64 to binary ArrayBuffer
+        const binaryString = atob(data.audio);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
         }
 
         if (!audioContextRef.current) {
-          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+          audioContextRef.current = new AudioContextClass();
         }
         
-        const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
+        // Ensure AudioContext is resumed if browser auto-suspended
+        if (audioContextRef.current.state === 'suspended') {
+          await audioContextRef.current.resume();
+        }
+
+        const audioBuffer = await audioContextRef.current.decodeAudioData(bytes.buffer);
         const source = audioContextRef.current.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(audioContextRef.current.destination);
@@ -150,42 +149,26 @@ export default function Chatbot({
     } catch (e) {
       console.warn('TTS API failed, falling back to Web Speech API:', e);
       
-      // Fallback to client-side SpeechSynthesis
       try {
         if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-          window.speechSynthesis.cancel(); // Stop any ongoing speech
-          
-          // Clean text from markdown formatting
+          window.speechSynthesis.cancel();
           const cleanText = text.replace(/[*#_\[\]()]/g, '');
           const utterance = new SpeechSynthesisUtterance(cleanText);
-          
-          // Simple heuristic to detect Spanish vs Portuguese in reply
-          const hasSpanish = /[áéíóúñ¿¡]/.test(text) || 
-                             text.toLowerCase().includes('hola') || 
-                             (text.toLowerCase().includes('casa') && !text.toLowerCase().includes('uma'));
-          
+          const hasSpanish = /[áéíóúñ¿¡]/.test(text) || text.toLowerCase().includes('hola');
           utterance.lang = hasSpanish ? 'es-ES' : 'pt-BR';
-          
-          utterance.onend = () => {
-            setPlayingAudioMsgId(null);
-          };
-          utterance.onerror = (err) => {
-            console.warn('SpeechSynthesisUtterance error:', err);
-            setPlayingAudioMsgId(null);
-          };
-          
+          utterance.onend = () => setPlayingAudioMsgId(null);
+          utterance.onerror = () => setPlayingAudioMsgId(null);
           window.speechSynthesis.speak(utterance);
         } else {
           setPlayingAudioMsgId(null);
         }
       } catch (err) {
-        console.warn('Web Speech API fallback failed:', err);
         setPlayingAudioMsgId(null);
       }
     }
   };
 
-  // Chat submission logic
+  // Chat submission logic with memory persistence
   const handleSendMessage = async (textToSend: string) => {
     if (!textToSend.trim() || isAiLoading) return;
 
@@ -201,12 +184,11 @@ export default function Chatbot({
     setInputMessage('');
     setIsAiLoading(true);
 
-    // AI Cognitive Stages Visualizer simulation
     const stages = [
       'Analisando intenção e regras LGPD...',
-      'Invocando ferramentas (search_properties)...',
+      'Recuperando memória salva do cliente...',
       'Filtrando imóveis disponíveis em Bahia...',
-      'Calculando ranking de afinidade e preferências...'
+      'Extraindo preferências e atualizando CRM...'
     ];
 
     let stageIdx = 0;
@@ -218,10 +200,9 @@ export default function Chatbot({
       } else {
         clearInterval(stageInterval);
       }
-    }, 1200);
+    }, 1100);
 
     try {
-      // Build full conversation payload
       const chatHistory = messages
         .filter(m => m.id !== 'welcome' && m.id !== 'lgpd-log')
         .map(m => ({
@@ -236,7 +217,8 @@ export default function Chatbot({
         body: JSON.stringify({
           messages: chatHistory,
           systemInstruction: agentInstruction,
-          properties: properties
+          properties: properties,
+          customerProfile: customerProfile
         })
       });
 
@@ -245,7 +227,12 @@ export default function Chatbot({
       setActiveCognitiveStage(null);
 
       if (data.reply) {
-        // Record inferences to database in real-time
+        // Automatic Customer Profile Memory Persistence
+        if (data.extractedCustomerInfo && onUpdateCustomerProfile) {
+          onUpdateCustomerProfile(data.extractedCustomerInfo);
+        }
+
+        // Record cognitive inferences
         if (data.inferredAttributes) {
           const inf = data.inferredAttributes;
           Object.keys(inf).forEach(key => {
@@ -255,15 +242,14 @@ export default function Chatbot({
                 customerId: 'cust-1',
                 attribute: key,
                 value: inf[key],
-                confidence: 0.85 + Math.random() * 0.1, // High quality inference confidence
-                evidence: inf.evidence || 'Conversa com agente inteligente.',
+                confidence: 0.90,
+                evidence: inf.evidence || 'Conversa com Maysa IA.',
                 updatedAt: new Date().toISOString()
               });
             }
           });
         }
 
-        // Add model reply to messages
         const modelMsg: Message = {
           id: 'msg-ai-' + Date.now(),
           conversationId: 'active-conv',
@@ -274,7 +260,6 @@ export default function Chatbot({
         };
         setMessages(prev => [...prev, modelMsg]);
 
-        // Auto play TTS response if voice synthesis is preferred
         if (isRecording) {
           speakMessage(modelMsg.id, data.reply);
         }
@@ -288,7 +273,7 @@ export default function Chatbot({
           id: 'msg-error-' + Date.now(),
           conversationId: 'active-conv',
           sender: 'agent',
-          text: 'Pedimos desculpas, mas Maysa está sem sinal de internet em Trancoso temporariamente. Como fallback, você pode usar os dados mostrados no CRM esquerdo.',
+          text: 'Maysa está temporariamente sem sinal em Trancoso. Por favor, tente novamente em instantes!',
           createdAt: new Date().toISOString()
         }
       ]);

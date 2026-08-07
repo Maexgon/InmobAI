@@ -10,6 +10,10 @@ import ConciergePanel from './components/ConciergePanel';
 import MapsView from './components/MapsView';
 import Chatbot from './components/Chatbot';
 import TelegramSimulator from './components/TelegramSimulator';
+import AdminPanel from './components/AdminPanel';
+import VendorPanel from './components/VendorPanel';
+import ClientMobileView from './components/ClientMobileView';
+import OwnerMobileView from './components/OwnerMobileView';
 import { inmobDb, initializeDatabase } from './lib/firebase';
 import { Property, Customer, Opportunity, Seller, Booking, ConciergeTask, CompanyConfig } from './types';
 import { 
@@ -203,13 +207,21 @@ export default function App() {
     await inmobDb.saveOpportunity(newOpp);
     const updatedOpps = await inmobDb.getOpportunities();
     setOpportunities(updatedOpps);
-  };
-
-  // Add custom inference from Maysa's cognitive agent
+    // Add custom inference from Maysa's cognitive agent
   const handleAddInference = async (inf: any) => {
     await inmobDb.addInference(inf);
     const updated = await inmobDb.getInferences();
     setInferences(updated);
+  };
+
+  // Auto-persist extracted customer profile memory
+  const handleUpdateCustomerProfile = async (extracted: any) => {
+    if (!extracted) return;
+    const updatedCust = await inmobDb.updateCustomerMemory('cust-1', extracted);
+    if (updatedCust) {
+      const updatedList = await inmobDb.getCustomers();
+      setCustomers(updatedList);
+    }
   };
 
   // Handle Maps Grounding Attraction Search
@@ -316,6 +328,52 @@ export default function App() {
           ) : (
             // REGULAR ROLE PANELS
             <div className="space-y-8">
+
+              {/* ADMIN PANEL */}
+              {currentTab === 'admin-panel' && (
+                <AdminPanel 
+                  properties={properties}
+                  onSaveProperty={handleSaveProperty}
+                  onDeleteProperty={handleDeleteProperty}
+                  customers={customers}
+                  sellers={sellers}
+                  companyConfig={companyConfig}
+                  onSaveCompanyConfig={handleSaveCompanyConfig}
+                  inferences={inferences}
+                />
+              )}
+
+              {/* VENDOR PANEL */}
+              {currentTab === 'vendor-panel' && (
+                <VendorPanel 
+                  opportunities={opportunities}
+                  onSaveOpportunity={handleSaveOpportunity}
+                  customers={customers}
+                  properties={properties}
+                  sellers={sellers}
+                  inferences={inferences}
+                />
+              )}
+
+              {/* CLIENT MOBILE VIEW */}
+              {currentTab === 'client-mobile' && (
+                <ClientMobileView 
+                  properties={properties}
+                  agentName={companyConfig.agentName}
+                  agentAvatar={companyConfig.agentAvatar}
+                  agentInstruction={companyConfig.agentInstruction}
+                  onBookProperty={handleBookProperty}
+                  onAddInference={handleAddInference}
+                  customerProfile={customers[0]}
+                />
+              )}
+
+              {/* OWNER MOBILE VIEW */}
+              {currentTab === 'owner-mobile' && (
+                <OwnerMobileView 
+                  properties={properties}
+                />
+              )}
               
               {/* CLIENT-PORTAL DISCOVERY MODE WITH MAP GROUNDING */}
               {currentTab === 'client-portal' && (
@@ -478,6 +536,8 @@ export default function App() {
                         agentInstruction={companyConfig.agentInstruction}
                         onBookProperty={handleBookProperty}
                         onAddInference={handleAddInference}
+                        customerProfile={customers[0]}
+                        onUpdateCustomerProfile={handleUpdateCustomerProfile}
                       />
                     </div>
                   </div>
@@ -490,6 +550,9 @@ export default function App() {
                   <TelegramSimulator />
                 </div>
               )}
+
+            </div>
+          )}
 
             </div>
           )}

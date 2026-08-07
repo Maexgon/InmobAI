@@ -15,27 +15,35 @@ export default function TelegramSimulator() {
   const [userInput, setUserInput] = useState('');
   const [isBotResponding, setIsBotResponding] = useState(false);
 
-  const sendSimulatedTelegramMessage = () => {
+  const sendSimulatedTelegramMessage = async () => {
     if (!userInput.trim() || isBotResponding) return;
 
     const time = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const userMsg = { sender: 'user' as const, text: userInput, time };
 
     setTelegramMessages(prev => [...prev, userMsg]);
+    const promptText = userInput;
     setUserInput('');
     setIsBotResponding(true);
 
-    // Simulate bot response after short delay
-    setTimeout(() => {
-      const botResponses = [
-        'Excelente! Tenho opções maravilhosas. A espetacular *Villa Trancoso Paradise* (com piscina privativa, chef de cozinha e vista mar) está disponível! Gostaria de receber os valores?',
-        'Claro! Temos casas lindas próximas à famosa Rua de Mucugê e à Praia de Mucugê em Arraial d\'ajuda. Qual a data da sua viagem e quantos hóspedes virão com você?',
-        'Perfeito! O consentimento LGPD foi registrado. Deixe-me buscar as melhores vilas com as coordenadas exatas no catálogo. Você prefere uma casa com heliponto ou pé na areia?'
-      ];
-      const randomReply = botResponses[Math.floor(Math.random() * botResponses.length)];
-      setTelegramMessages(prev => [...prev, { sender: 'bot', text: randomReply, time }]);
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'client', text: promptText }],
+          systemInstruction: 'Você é Maysa, assistente do Telegram da InmobAI Bahia. Seja extremamente curta, gentil e elegante.',
+          properties: []
+        })
+      });
+      const data = await response.json();
+      const reply = data.reply || 'Olá! Como posso ajudar você hoje em Trancoso ou Arraial?';
+      setTelegramMessages(prev => [...prev, { sender: 'bot', text: reply, time }]);
+    } catch (e) {
+      setTelegramMessages(prev => [...prev, { sender: 'bot', text: 'Olá! Recebi sua mensagem no Telegram e já registrei no CRM da InmobAI.', time }]);
+    } finally {
       setIsBotResponding(false);
-    }, 1200);
+    }
   };
 
   return (

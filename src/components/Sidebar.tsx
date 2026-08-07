@@ -38,13 +38,16 @@ export default function Sidebar({
   
   const menuItems = [
     { id: 'client-portal', label: 'Catálogo de Imóveis', icon: Compass, roles: ['admin', 'seller', 'owner', 'client'] },
-    { id: 'maysa-chat', label: 'Chat com Maysa (Celular)', icon: Smartphone, roles: ['admin', 'seller', 'owner', 'client'] },
+    { id: 'client-mobile', label: 'Vista Clientes (Móvil)', icon: Smartphone, roles: ['admin', 'client'] },
+    { id: 'owner-mobile', label: 'Vista Dueños (Móvil)', icon: Building2, roles: ['admin', 'owner'] },
+    { id: 'vendor-panel', label: 'Vista Vendedor (CRM)', icon: Users, roles: ['admin', 'seller'] },
+    { id: 'admin-panel', label: 'Painel Administrador', icon: Settings2, roles: ['admin'] },
+    { id: 'maysa-chat', label: 'Chat Maysa (Celular)', icon: Smartphone, roles: ['admin', 'seller', 'owner', 'client'] },
     { id: 'telegram-sim', label: 'Simulador Telegram', icon: MessageSquare, roles: ['admin', 'seller'] },
     { id: 'dashboard', label: 'Dashboard CRM', icon: Building2, roles: ['admin', 'seller'] },
     { id: 'conversations', label: 'Histórico & IA Inferences', icon: Bot, roles: ['admin', 'seller'] },
     { id: 'properties', label: 'Gerenciar Imóveis', icon: MapPin, roles: ['admin', 'seller', 'owner'] },
-    { id: 'concierge', label: 'Serviço de Concierge', icon: HeartHandshake, roles: ['admin', 'seller', 'owner', 'client'] },
-    { id: 'agent-config', label: 'Configuração da IA', icon: Settings2, roles: ['admin'] }
+    { id: 'concierge', label: 'Serviço de Concierge', icon: HeartHandshake, roles: ['admin', 'seller', 'owner', 'client'] }
   ];
 
   const filteredItems = menuItems.filter(item => item.roles.includes(userRole));
@@ -73,18 +76,20 @@ export default function Sidebar({
             onChange={(e) => {
               const role = e.target.value as any;
               setUserRole(role);
-              // Auto reset tab if role doesn't support current tab
               const supported = menuItems.find(item => item.id === currentTab)?.roles.includes(role);
               if (!supported) {
-                setCurrentTab('client-portal');
+                if (role === 'admin') setCurrentTab('admin-panel');
+                else if (role === 'seller') setCurrentTab('vendor-panel');
+                else if (role === 'owner') setCurrentTab('owner-mobile');
+                else setCurrentTab('client-mobile');
               }
             }}
             className="w-full bg-[#111827] text-white text-xs rounded-lg p-2 border border-slate-600 focus:outline-none focus:ring-1 focus:ring-[#10B981]"
           >
             <option value="admin">Administrador (Completo)</option>
-            <option value="seller">Vendedor / Corretor</option>
-            <option value="owner">Proprietário da Casa</option>
-            <option value="client">Cliente / Hóspede</option>
+            <option value="seller">Vendedor / Operador</option>
+            <option value="owner">Proprietário / Dueño (Móvil)</option>
+            <option value="client">Cliente / Hóspede (Móvil)</option>
           </select>
         </div>
 

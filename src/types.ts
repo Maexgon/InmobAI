@@ -19,6 +19,9 @@ export interface Property {
   amenities: string[];
   nearbyAttractions: string[];
   ownerId: string;
+  ownerName?: string;
+  ownerPhone?: string;
+  isAvailable?: boolean;
 }
 
 export interface Customer {
@@ -29,12 +32,20 @@ export interface Customer {
   lgpdConsent: boolean;
   lgpdTimestamp?: string;
   createdAt: string;
+  // Extracted memory fields
+  travelDates?: { start: string; end: string };
+  guestsCount?: number;
+  hasChildren?: boolean;
+  budgetPerNight?: number;
+  preferredCity?: string;
+  beachPreference?: 'pé_na_areia' | 'falésia' | 'centro' | 'qualquer';
+  hasCar?: boolean;
 }
 
 export interface CustomerInference {
   id: string;
   customerId: string;
-  attribute: string; // 'communication_style' | 'budget' | 'urgency' | 'preferences'
+  attribute: string; // 'communication_style' | 'budget' | 'urgency' | 'preferences' | 'location_pref'
   value: string;
   confidence: number; // 0 to 1
   evidence: string;
@@ -48,6 +59,7 @@ export interface Conversation {
   status: 'active' | 'archived' | 'escalated';
   lastMessageAt: string;
   summary?: string;
+  channel?: 'web' | 'telegram' | 'whatsapp';
 }
 
 export interface Message {
@@ -71,6 +83,7 @@ export interface Opportunity {
   stage: 'Discovery' | 'Qualification' | 'Proposal' | 'Reservation' | 'Closed';
   assignedSellerId: string;
   updatedAt: string;
+  notes?: string;
 }
 
 export interface Seller {
@@ -91,12 +104,26 @@ export interface Booking {
   endDate: string;
   totalPrice: number;
   status: 'pending' | 'confirmed' | 'cancelled';
+  pixCode?: string;
+  pixQrUrl?: string;
   staffAssigned: {
     cleaner?: string;
     chef?: string;
     concierge?: string;
   };
   createdAt: string;
+}
+
+export interface OwnerPayout {
+  id: string;
+  ownerId: string;
+  ownerName: string;
+  propertyName: string;
+  amount: number;
+  pixKey: string;
+  status: 'transferred' | 'processing';
+  date: string;
+  receiptUrl?: string;
 }
 
 export interface ConciergeTask {
@@ -121,4 +148,21 @@ export interface CompanyConfig {
   agentName: string;
   agentAvatar: string;
   agentInstruction: string;
+  telegramBotToken?: string;
+  pixKey?: string;
 }
+
+export interface ExtractedCustomerProfile {
+  name?: string;
+  email?: string;
+  phone?: string;
+  travelDates?: { start: string; end: string };
+  guestsCount?: number;
+  hasChildren?: boolean;
+  budgetPerNight?: number;
+  preferredCity?: 'Trancoso' | 'Arraial d\'ajuda' | 'Ambas';
+  beachPreference?: 'pé_na_areia' | 'falésia' | 'centro' | 'qualquer';
+  hasCar?: boolean;
+  lgpdConsent?: boolean;
+}
+

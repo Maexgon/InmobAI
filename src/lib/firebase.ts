@@ -384,6 +384,76 @@ export const inmobDb = {
     return getLocalStorageData('sellers', DEFAULT_SELLERS);
   },
 
+  // Memory & Profile auto-updater
+  updateCustomerMemory: async (customerId: string, extractedProfile: Partial<Customer>): Promise<Customer | null> => {
+    try {
+      const customers = await inmobDb.getCustomers();
+      const targetIdx = customers.findIndex(c => c.id === customerId);
+      if (targetIdx >= 0) {
+        const updated = {
+          ...customers[targetIdx],
+          ...extractedProfile,
+          // preserve ID and basic identity if not overwritten
+          id: customerId
+        };
+        customers[targetIdx] = updated;
+        try {
+          await setDoc(doc(db, 'customers', customerId), updated, { merge: true });
+        } catch {}
+        setLocalStorageData('customers', customers);
+        return updated;
+      }
+    } catch (e) {
+      console.warn('Error updating customer memory:', e);
+    }
+    return null;
+  },
+
+  // Owner Payouts (Pix Transfers to Property Owners)
+  getPayouts: async (ownerId?: string): Promise<OwnerPayout[]> => {
+    const defaultPayouts: OwnerPayout[] = [
+      {
+        id: 'pay-1',
+        ownerId: 'owner-joao',
+        ownerName: 'João Carlos de Alencar',
+        propertyName: 'Villa Trancoso Paradise',
+        amount: 28350, // 90% of booking after 10% agency fee
+        pixKey: 'joao.alencar@trancosomail.com',
+        status: 'transferred',
+        date: '2026-08-07T10:00:00Z',
+        receiptUrl: 'pix-rec-98213791.pdf'
+      },
+      {
+        id: 'pay-2',
+        ownerId: 'owner-maria',
+        ownerName: 'Maria Silva & Silva',
+        propertyName: 'Arraial Ocean Breeze Loft',
+        amount: 11340,
+        pixKey: '73999881122',
+        status: 'transferred',
+        date: '2026-08-05T14:30:00Z',
+        receiptUrl: 'pix-rec-98213790.pdf'
+      }
+    ];
+    try {
+      const snap = await getDocs(collection(db, 'payouts'));
+      const list = snap.docs.map(d => d.data() as OwnerPayout);
+      if (list.length > 0) {
+        return ownerId ? list.filter(p => p.ownerId === ownerId) : list;
+      }
+    } catch {}
+    const local = getLocalStorageData('payouts', defaultPayouts);
+    return ownerId ? local.filter(p => p.ownerId === ownerId) : local;
+  },
+  savePayout: async (payout: OwnerPayout): Promise<void> => {
+    try {
+      await setDoc(doc(db, 'payouts', payout.id), payout);
+    } catch {}
+    const payouts = getLocalStorageData('payouts', []);
+    payouts.push(payout);
+    setLocalStorageData('payouts', payouts);
+  },
+
   // Conversations
   getConversations: async (): Promise<Conversation[]> => {
     return getLocalStorageData('conversations_meta', [
