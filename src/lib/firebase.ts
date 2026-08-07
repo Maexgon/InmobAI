@@ -20,9 +20,9 @@ import {
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Property, Customer, Opportunity, CompanyConfig, Booking, ConciergeTask, Conversation, Message, CustomerInference, Seller } from '../types';
 
-// Initialize Firebase
+// Initialize Firebase with custom databaseId 'inmobdb'
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const db = getFirestore(app);
+export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId || 'inmobdb');
 
 // Mock Data Definitions
 const DEFAULT_PROPERTIES: Property[] = [
