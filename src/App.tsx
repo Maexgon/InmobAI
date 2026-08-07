@@ -207,7 +207,9 @@ export default function App() {
     await inmobDb.saveOpportunity(newOpp);
     const updatedOpps = await inmobDb.getOpportunities();
     setOpportunities(updatedOpps);
-    // Add custom inference from Maysa's cognitive agent
+  };
+
+  // Add custom inference from Maysa's cognitive agent
   const handleAddInference = async (inf: any) => {
     await inmobDb.addInference(inf);
     const updated = await inmobDb.getInferences();
@@ -550,9 +552,6 @@ export default function App() {
                   <TelegramSimulator />
                 </div>
               )}
-
-            </div>
-          )}
 
             </div>
           )}
