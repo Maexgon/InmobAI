@@ -155,6 +155,7 @@ Você deve responder rigorosamente no formato JSON especificado.
     const resultText = response.text || '{}';
     res.json(JSON.parse(resultText));
   } catch (error: any) {
+    console.error('CRITICAL CHAT ERROR:', error);
     console.warn('Chat error (using smart fallback demo response):', error.message);
     
     // Smart offline/demo fallback when no valid API key is present
