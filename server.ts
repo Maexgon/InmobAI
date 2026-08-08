@@ -226,7 +226,8 @@ app.post('/api/tts', async (req, res) => {
     // ElevenLabs implementation (best quality for PT-BR if quota available)
     if (process.env.ELEVENLABS_API_KEY) {
       try {
-        const voiceId = 'GDzHdQOi6jjf8zaXhCYD'; // Example ElevenLabs voice
+        // We use a default free-tier voice (Bella) instead of a premium Library voice
+        const voiceId = 'EXAVITQu4vr4xnSDxMaL'; 
         const elResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
           method: 'POST',
           headers: {
