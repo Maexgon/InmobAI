@@ -229,7 +229,7 @@ app.post('/api/tts', async (req, res) => {
     
     const request: any = {
       input: { text },
-      voice: { languageCode: 'pt-BR', name: 'pt-BR-Neural2-B' },
+      voice: { languageCode: 'pt-BR', name: 'pt-BR-Neural2-A' }, // Voz femenina
       audioConfig: { audioEncoding: 'MP3' },
     };
 
