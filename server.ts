@@ -58,9 +58,8 @@ function pcmToWav(pcmData: Buffer, sampleRate = 24000, numChannels = 1, bitsPerS
 
 // 1. Chatbot endpoint with Structured JSON, Cognitive inferences & Automatic Customer Profile Memory Extraction
 app.post('/api/chat', async (req, res) => {
+  const { messages = [], systemInstruction, properties, customerProfile } = req.body || {};
   try {
-    const { messages, systemInstruction, properties, customerProfile } = req.body;
-    
     const formattedHistory = messages.map((m: any) => ({
       role: m.role === 'client' ? 'user' : 'model',
       parts: [{ text: m.text }]
