@@ -8,6 +8,7 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
+import textToSpeech from '@google-cloud/text-to-speech';
 
 dotenv.config();
 
@@ -15,6 +16,9 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+// Initialize Google Cloud TTS Client (Uses GOOGLE_APPLICATION_CREDENTIALS from .env)
+const ttsClient = new textToSpeech.TextToSpeechClient();
 
 // Initialize Gemini SDK with custom User-Agent
 const apiKey = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY || 'AIzaSy_DEMO_KEY';
@@ -218,44 +222,26 @@ app.post('/api/grounding', async (req, res) => {
   }
 });
 
-// 3. TTS (Text to Speech) using ElevenLabs with Chrome fallback
+// 3. TTS (Text to Speech) using Google Cloud Text-to-Speech API (Neural2-B pt-BR)
 app.post('/api/tts', async (req, res) => {
   try {
-    const { text, voice } = req.body; 
+    const { text } = req.body; 
     
-    // ElevenLabs implementation (best quality for PT-BR if quota available)
-    if (process.env.ELEVENLABS_API_KEY) {
-      try {
-        // We use a default free-tier voice (Bella) instead of a premium Library voice
-        const voiceId = 'EXAVITQu4vr4xnSDxMaL'; 
-        const elResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-          method: 'POST',
-          headers: {
-            'Accept': 'audio/mpeg',
-            'Content-Type': 'application/json',
-            'xi-api-key': process.env.ELEVENLABS_API_KEY
-          },
-          body: JSON.stringify({
-            text,
-            model_id: 'eleven_multilingual_v2',
-            voice_settings: { stability: 0.5, similarity_boost: 0.75 }
-          })
-        });
+    const request: any = {
+      input: { text },
+      voice: { languageCode: 'pt-BR', name: 'pt-BR-Neural2-B' },
+      audioConfig: { audioEncoding: 'MP3' },
+    };
 
-        if (elResponse.ok) {
-          const arrayBuffer = await elResponse.arrayBuffer();
-          const base64Audio = Buffer.from(arrayBuffer).toString('base64');
-          return res.json({ audio: base64Audio, format: 'audio/mpeg' });
-        } else {
-          console.warn('ElevenLabs API response not ok:', await elResponse.text());
-        }
-      } catch (err: any) {
-        console.warn('ElevenLabs API falhou:', err.message);
-      }
+    const [response] = await ttsClient.synthesizeSpeech(request);
+    
+    if (response.audioContent) {
+      const base64Audio = Buffer.from(response.audioContent).toString('base64');
+      return res.json({ audio: base64Audio, format: 'audio/mpeg' });
+    } else {
+      console.warn('Google Cloud TTS API falhou: sem conteudo de audio');
+      return res.status(404).json({ error: 'Nenhum provedor de TTS premium disponível no momento' });
     }
-
-    // If ElevenLabs fails or missing key, fail gracefully so frontend uses window.speechSynthesis
-    res.status(404).json({ error: 'Nenhum provedor de TTS premium disponível no momento' });
   } catch (error: any) {
     console.warn(`[TTS] Exception: ${error.message}`);
     res.status(500).json({ error: error.message || 'Erro ao sintetizar resposta em voz' });
