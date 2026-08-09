@@ -190,7 +190,7 @@ Você deve responder rigorosamente no formato JSON especificado.
       ];
 
       const orResponse = await openai.chat.completions.create({
-        model: 'google/gemma-2-9b-it:free',
+        model: 'openrouter/free',
         messages: openRouterMessages as any,
         response_format: { type: 'json_object' }
       });
