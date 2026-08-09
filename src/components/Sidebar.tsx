@@ -38,6 +38,7 @@ export default function Sidebar({
   
   const menuItems = [
     { id: 'client-portal', label: 'Catálogo de Imóveis', icon: Compass, roles: ['admin', 'seller', 'owner', 'client'] },
+    { id: 'android-app', label: 'App Mobile Android 📱', icon: Smartphone, roles: ['admin', 'seller', 'owner', 'client'] },
     { id: 'client-mobile', label: 'Vista Clientes (Móvil)', icon: Smartphone, roles: ['admin', 'client'] },
     { id: 'owner-mobile', label: 'Vista Dueños (Móvil)', icon: Building2, roles: ['admin', 'owner'] },
     { id: 'vendor-panel', label: 'Vista Vendedor (CRM)', icon: Users, roles: ['admin', 'seller'] },

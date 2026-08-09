@@ -1,0 +1,8 @@
+{
+  "appId": "com.inmobai.maysa",
+  "appName": "Maysa IA Concierge",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}

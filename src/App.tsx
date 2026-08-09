@@ -14,6 +14,7 @@ import AdminPanel from './components/AdminPanel';
 import VendorPanel from './components/VendorPanel';
 import ClientMobileView from './components/ClientMobileView';
 import OwnerMobileView from './components/OwnerMobileView';
+import MobileApp from './components/MobileApp';
 import { inmobDb, initializeDatabase } from './lib/firebase';
 import { Property, Customer, Opportunity, Seller, Booking, ConciergeTask, CompanyConfig } from './types';
 import { 
@@ -377,6 +378,21 @@ export default function App() {
                 />
               )}
               
+            {/* APP MOBILE ANDROID FULLSCREEN EXPERIENCE */}
+            {currentTab === 'android-app' ? (
+              <MobileApp
+                properties={properties}
+                agentName={companyConfig.agentName}
+                agentAvatar={companyConfig.agentAvatar}
+                agentInstruction={companyConfig.agentInstruction}
+                onBookProperty={handleBookProperty}
+                onAddInference={handleAddInference}
+                customerProfile={customers[0]}
+                onUpdateCustomerProfile={handleUpdateCustomerProfile}
+                onSwitchToDesktop={() => setCurrentTab('client-portal')}
+              />
+            ) : (
+              <>
               {/* CLIENT-PORTAL DISCOVERY MODE WITH MAP GROUNDING */}
               {currentTab === 'client-portal' && (
                 <div className="space-y-8">
@@ -552,6 +568,9 @@ export default function App() {
                   <TelegramSimulator />
                 </div>
               )}
+
+              </>
+            )}
 
             </div>
           )}
