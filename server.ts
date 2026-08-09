@@ -178,7 +178,12 @@ Você deve responder rigorosamente no formato JSON especificado.
       
       const openai = new OpenAI({
         baseURL: "https://openrouter.ai/api/v1",
-        apiKey: process.env.OPENROUTER_API_KEY
+        apiKey: process.env.OPENROUTER_API_KEY,
+        defaultHeaders: {
+          "HTTP-Referer": "http://localhost:3000",
+          "X-Title": "InmobAI",
+        },
+        timeout: 8000
       });
 
       const openRouterMessages = [
@@ -190,7 +195,7 @@ Você deve responder rigorosamente no formato JSON especificado.
       ];
 
       const orResponse = await openai.chat.completions.create({
-        model: 'openrouter/free',
+        model: 'google/gemma-4-31b-it:free',
         messages: openRouterMessages as any,
         response_format: { type: 'json_object' }
       });
