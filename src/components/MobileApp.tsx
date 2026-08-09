@@ -3,11 +3,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Home, CalendarCheck, User, Wifi, Battery, Signal, ArrowLeft, Monitor, Smartphone } from 'lucide-react';
+import { MessageSquare, Home, CalendarCheck, User, Wifi, Battery, Signal, ArrowLeft, Monitor, Smartphone, MapPin, BedDouble, Users } from 'lucide-react';
 import Chatbot from './Chatbot';
-import PropertyList from './PropertyList';
-import PropertyModal from './PropertyModal';
-import CustomerProfileCard from './CustomerProfileCard';
 import { Property } from '../types';
 
 interface MobileAppProps {
@@ -110,15 +107,35 @@ export default function MobileApp({
         )}
 
         {activeTab === 'properties' && (
-          <div className="p-4 pb-20">
-            <div className="mb-4">
+          <div className="p-4 pb-20 space-y-4">
+            <div className="mb-2">
               <h2 className="text-lg font-bold text-slate-100">Casas Exclusivas</h2>
               <p className="text-xs text-slate-400">Trancoso & Arraial d'ajuda</p>
             </div>
-            <PropertyList 
-              properties={properties} 
-              onSelectProperty={(prop) => setSelectedProperty(prop)}
-            />
+            <div className="grid grid-cols-1 gap-4">
+              {properties.map(prop => (
+                <div key={prop.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
+                  <div className="relative h-44">
+                    <img src={prop.images[0]} alt={prop.title} className="w-full h-full object-cover" />
+                    <div className="absolute top-3 right-3 bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-emerald-400 border border-emerald-500/30">
+                      R$ {prop.pricePerNight} / noite
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-2">
+                    <div className="flex items-center text-[11px] text-cyan-400 font-semibold gap-1">
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span>{prop.city}</span>
+                    </div>
+                    <h3 className="font-bold text-sm text-slate-100">{prop.title}</h3>
+                    <p className="text-xs text-slate-400 line-clamp-2">{prop.description}</p>
+                    <div className="pt-2 border-t border-slate-800 flex justify-between text-xs text-slate-400">
+                      <span className="flex items-center gap-1"><BedDouble className="w-3.5 h-3.5 text-slate-400" /> {prop.bedrooms} Quarto(s)</span>
+                      <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5 text-slate-400" /> Até {prop.maxGuests} Pessoas</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -141,12 +158,36 @@ export default function MobileApp({
         )}
 
         {activeTab === 'profile' && (
-          <div className="p-4 pb-20">
-            <div className="mb-4">
+          <div className="p-4 pb-20 space-y-4">
+            <div className="mb-2">
               <h2 className="text-lg font-bold text-slate-100">Perfil & Preferências CRM</h2>
               <p className="text-xs text-slate-400">Dados aprendidos automaticamente por Maysa IA</p>
             </div>
-            <CustomerProfileCard customer={customerProfile} />
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center space-x-3 pb-3 border-b border-slate-800">
+                <div className="w-12 h-12 bg-cyan-500/10 rounded-full flex items-center justify-center text-cyan-400 font-bold border border-cyan-500/20 text-lg">
+                  {customerProfile?.name ? customerProfile.name[0] : 'C'}
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-100">{customerProfile?.name || 'Cliente Convidado'}</h3>
+                  <p className="text-xs text-slate-400">{customerProfile?.email || 'email@exemplo.com'}</p>
+                </div>
+              </div>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between py-1 border-b border-slate-800/50">
+                  <span className="text-slate-400">Telefone:</span>
+                  <span className="font-medium text-slate-200">{customerProfile?.phone || 'Não informado'}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-800/50">
+                  <span className="text-slate-400">Cidade Preferida:</span>
+                  <span className="font-medium text-slate-200">{customerProfile?.preferredCity || 'Trancoso'}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-800/50">
+                  <span className="text-slate-400">Hóspedes:</span>
+                  <span className="font-medium text-slate-200">{customerProfile?.guestsCount || 2} pessoas</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </main>
