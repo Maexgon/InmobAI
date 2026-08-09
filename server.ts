@@ -9,6 +9,7 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 import textToSpeech from '@google-cloud/text-to-speech';
+import nodemailer from 'nodemailer';
 
 dotenv.config();
 
@@ -92,7 +93,8 @@ DIRETRIZES DE ATENDIMENTO CONSULTIVO E EXTRAÇÃO DE MEMÓRIA (CONCIERGE DE LUXO
 - NÃO SEJA ROBÓTICO: Não vá direto oferecer opções de imóveis no primeiro contato sem antes cumprimentar e entender o que a pessoa precisa.
 - NÃO PERGUNTE O QUE JÁ SABE: Se a memória do cliente já possui informações (ex: nome, quantidade de pessoas, se tem crianças), NÃO volte a perguntar!
 - EXTRAÇÃO DE DADOS DO CLIENTE: Sempre que o cliente fornecer dados na mensagem (como nome, telefone, email, datas, hóspedes, orçamento, localização), EXTRAIA essas informações estruturadas no objeto extractedCustomerInfo para salvarmos na base de dados!
-- Somente após estabelecer a conexão humana e obter os dados essenciais, faça recomendações de imóveis do catálogo.
+- RECOMENDAÇÃO DE IMÓVEIS (suggestedPropertyIds): Você DEVE retornar um array VAZIO [] em "suggestedPropertyIds" até o momento em que você decidir explicitamente oferecer uma opção da lista. Só preencha este array quando estiver literalmente sugerindo opções na sua mensagem atual.
+- Somente após estabelecer a conexão humana e obter os dados essenciais, faça recomendações de imóveis do catálogo e preencha "suggestedPropertyIds".
 
 ${propertiesContext}
 
@@ -103,6 +105,7 @@ Você deve responder rigorosamente no formato JSON especificado.
       model: 'gemini-3.6-flash',
       contents: formattedHistory.length > 0 ? formattedHistory : [{ role: 'user', parts: [{ text: 'Olá' }] }],
       config: {
+        tools: [{ googleMaps: {} }],
         systemInstruction: chatInstruction,
         responseMimeType: 'application/json',
         responseSchema: {
@@ -397,6 +400,54 @@ app.post('/api/workspace/gmail', async (req, res) => {
     realApi: false,
     message: 'E-mail simulado enviado com sucesso (modo de demonstração)'
   });
+});
+
+// Endpoint para envio do formulário de reserva via Nodemailer
+app.post('/api/book', async (req, res) => {
+  try {
+    const { propertyTitle, propertyId, clientName, clientDni, clientEmail, clientPhone, checkIn, checkOut, specialRequests } = req.body;
+
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: false, // true for 465, false for other ports
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+
+    // Se as credenciais não estiverem configuradas, simular o envio para testes no frontend
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.warn('[Nodemailer] SMTP Credentials missing, simulating booking email send.');
+      return res.json({ success: true, simulated: true, message: 'Reserva registrada (email simulado devido à falta de credenciais).' });
+    }
+
+    const mailOptions = {
+      from: \`"InmobAI Concierge" <\${process.env.SMTP_USER}>\`,
+      to: process.env.ADMIN_EMAIL || process.env.SMTP_USER, // Notificar al admin
+      subject: \`NOVA RESERVA - \${propertyTitle} - \${clientName}\`,
+      html: \`
+        <h2>Nova Solicitação de Reserva</h2>
+        <p><strong>Propriedade:</strong> \${propertyTitle} (\${propertyId})</p>
+        <p><strong>Check-In:</strong> \${checkIn}</p>
+        <p><strong>Check-Out:</strong> \${checkOut}</p>
+        <hr/>
+        <h3>Dados do Hóspede</h3>
+        <p><strong>Nome:</strong> \${clientName}</p>
+        <p><strong>DNI/Passaporte:</strong> \${clientDni}</p>
+        <p><strong>Email:</strong> \${clientEmail}</p>
+        <p><strong>Telefone:</strong> \${clientPhone}</p>
+        <p><strong>Pedidos Especiais:</strong> \${specialRequests || 'Nenhum'}</p>
+      \`
+    };
+
+    await transporter.sendMail(mailOptions);
+    res.json({ success: true, message: 'Reserva enviada com sucesso!' });
+  } catch (error: any) {
+    console.error('[Nodemailer] Erro ao enviar email de reserva:', error);
+    res.status(500).json({ error: error.message || 'Falha ao enviar reserva' });
+  }
 });
 
 // Vite Middleware for development / Static Serving in production

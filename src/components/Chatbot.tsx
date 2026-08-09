@@ -48,6 +48,11 @@ export default function Chatbot({
   
   // Audio playback state
   const [playingAudioMsgId, setPlayingAudioMsgId] = useState<string | null>(null);
+
+  // Modal states
+  const [bookingModalProp, setBookingModalProp] = useState<Property | null>(null);
+  const [bookingForm, setBookingForm] = useState({ name: '', dni: '', email: '', phone: '', checkIn: '', checkOut: '', specialRequests: '' });
+  const [isBookingSubmitting, setIsBookingSubmitting] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -301,27 +306,55 @@ export default function Chatbot({
     }
   };
 
-  // Handle instant booking
+  // Handle instant booking modal open
   const triggerHoldBooking = (prop: Property) => {
-    onBookProperty(prop, { start: '2026-09-10', end: '2026-09-17' });
-    confetti({
-      particleCount: 120,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ['#10B981', '#0EA5E9', '#111827']
-    });
-    setMessages(prev => [
-      ...prev,
-      {
-        id: 'msg-book-' + Date.now(),
-        conversationId: 'active-conv',
-        sender: 'agent',
-        text: `✓ Espetacular escolha! Realizei a Pré-Reserva (Hold) da **${prop.title}** para você. Já preparei os termos de hospitalidade e agendei a limpeza gourmet no painel de Concierge à esquerda!`,
-        createdAt: new Date().toISOString()
-      }
-    ]);
+    setBookingModalProp(prop);
   };
 
+  const submitBookingForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bookingModalProp) return;
+    setIsBookingSubmitting(true);
+    
+    try {
+      const response = await fetch('/api/book', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          propertyTitle: bookingModalProp.title,
+          propertyId: bookingModalProp.id,
+          clientName: bookingForm.name,
+          clientDni: bookingForm.dni,
+          clientEmail: bookingForm.email,
+          clientPhone: bookingForm.phone,
+          checkIn: bookingForm.checkIn,
+          checkOut: bookingForm.checkOut,
+          specialRequests: bookingForm.specialRequests
+        })
+      });
+
+      if (response.ok) {
+        onBookProperty(bookingModalProp, { start: bookingForm.checkIn, end: bookingForm.checkOut });
+        confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 }, colors: ['#10B981', '#0EA5E9', '#111827'] });
+        setMessages(prev => [
+          ...prev,
+          {
+            id: 'msg-book-' + Date.now(),
+            conversationId: 'active-conv',
+            sender: 'agent',
+            text: `✓ Formulário enviado com sucesso! Realizei a solicitação de reserva da **${bookingModalProp.title}** para você e os detalhes foram encaminhados por e-mail. Um concierge humano da InmobAI entrará em contato em breve!`,
+            createdAt: new Date().toISOString()
+          }
+        ]);
+        setBookingModalProp(null);
+        setBookingForm({ name: '', dni: '', email: '', phone: '', checkIn: '', checkOut: '', specialRequests: '' });
+      }
+    } catch (err) {
+      console.error('Error submitting booking', err);
+    } finally {
+      setIsBookingSubmitting(false);
+    }
+  };
   return (
     <div className="bg-white flex flex-col h-full w-full relative overflow-hidden">
       
@@ -519,6 +552,35 @@ export default function Chatbot({
           >
             <Send className="w-4.5 h-4.5" />
           </button>
+        </div>
+      )}
+
+      {/* Booking Modal */}
+      {bookingModalProp && (
+        <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl flex flex-col max-h-full overflow-y-auto">
+            <h3 className="font-bold text-lg mb-4">Solicitação de Reserva</h3>
+            <p className="text-xs text-slate-500 mb-4">Preencha os dados abaixo para iniciar a reserva da propriedade <strong>{bookingModalProp.title}</strong>.</p>
+            
+            <form onSubmit={submitBookingForm} className="space-y-4">
+              <input type="text" required placeholder="Nome Completo" value={bookingForm.name} onChange={e => setBookingForm({...bookingForm, name: e.target.value})} className="w-full text-sm p-3 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#10B981]" />
+              <input type="text" required placeholder="DNI ou Passaporte" value={bookingForm.dni} onChange={e => setBookingForm({...bookingForm, dni: e.target.value})} className="w-full text-sm p-3 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#10B981]" />
+              <input type="email" required placeholder="Email" value={bookingForm.email} onChange={e => setBookingForm({...bookingForm, email: e.target.value})} className="w-full text-sm p-3 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#10B981]" />
+              <input type="tel" required placeholder="Telefone / WhatsApp" value={bookingForm.phone} onChange={e => setBookingForm({...bookingForm, phone: e.target.value})} className="w-full text-sm p-3 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#10B981]" />
+              <div className="flex gap-4">
+                <input type="date" required placeholder="Check-In" value={bookingForm.checkIn} onChange={e => setBookingForm({...bookingForm, checkIn: e.target.value})} className="w-full text-sm p-3 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#10B981]" />
+                <input type="date" required placeholder="Check-Out" value={bookingForm.checkOut} onChange={e => setBookingForm({...bookingForm, checkOut: e.target.value})} className="w-full text-sm p-3 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#10B981]" />
+              </div>
+              <textarea placeholder="Pedidos Especiais (Ex: berço, chef privado...)" value={bookingForm.specialRequests} onChange={e => setBookingForm({...bookingForm, specialRequests: e.target.value})} className="w-full text-sm p-3 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#10B981] min-h-[80px]" />
+              
+              <div className="flex gap-3 pt-2 mt-auto">
+                <button type="button" onClick={() => setBookingModalProp(null)} className="flex-1 py-3 text-sm font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
+                <button type="submit" disabled={isBookingSubmitting} className="flex-1 py-3 text-sm font-bold bg-[#10B981] hover:bg-emerald-600 text-white rounded-xl transition-colors disabled:opacity-50">
+                  {isBookingSubmitting ? 'Enviando...' : 'Confirmar Reserva'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
