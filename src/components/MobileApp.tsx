@@ -45,66 +45,78 @@ export default function MobileApp({
   }, []);
 
   return (
-    <div className="fixed inset-0 bg-slate-950 flex flex-col justify-between overflow-hidden font-sans text-slate-100 select-none">
+    <div className="fixed inset-0 bg-slate-950 flex items-center justify-center p-0 md:p-6 font-sans text-slate-100 select-none overflow-hidden">
       
-      {/* Android Native Top Status Bar Emulation */}
-      <div className="bg-slate-950 px-4 py-1 flex items-center justify-between text-xs font-semibold text-slate-400 z-50 border-b border-slate-900">
-        <span>{currentTime || '12:00'}</span>
-        <div className="flex items-center space-x-2">
-          <Wifi className="w-3.5 h-3.5 text-cyan-400" />
-          <Signal className="w-3.5 h-3.5 text-slate-300" />
-          <Battery className="w-4 h-4 text-emerald-400" />
-        </div>
-      </div>
-
-      {/* Android Native Header Bar */}
-      <header className="bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 flex items-center justify-between z-40">
-        <div className="flex items-center space-x-3">
-          <div className="relative">
-            <img 
-              src={agentAvatar} 
-              alt={agentName} 
-              className="w-10 h-10 rounded-full object-cover ring-2 ring-cyan-500/50 shadow-md"
-            />
-            <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full ring-2 ring-slate-900"></span>
-          </div>
-          <div>
-            <h1 className="font-bold text-sm text-slate-100 flex items-center gap-1.5">
-              {agentName}
-              <span className="text-[10px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-1.5 py-0.2 rounded-full font-medium">
-                Android App
-              </span>
-            </h1>
-            <p className="text-[11px] text-emerald-400 font-medium">Online • Concierge Trancoso</p>
+      {/* Smartphone Frame Container */}
+      <div className="w-full h-full md:max-w-[410px] md:max-h-[850px] bg-slate-900 md:border-[12px] border-slate-800 md:rounded-[3rem] shadow-2xl flex flex-col relative overflow-hidden">
+        
+        {/* Android Speaker Slot (Only visible on desktop view) */}
+        <div className="hidden md:flex absolute top-0 inset-x-0 h-5 bg-slate-900 items-center justify-center z-50">
+          <div className="w-16 h-3 bg-slate-800 rounded-full flex items-center justify-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-700"></span>
+            <span className="w-8 h-0.5 bg-slate-700 rounded-full"></span>
           </div>
         </div>
 
-        <button
-          onClick={onSwitchToDesktop}
-          className="flex items-center space-x-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 transition"
-          title="Ver versión Escritorio"
-        >
-          <Monitor className="w-3.5 h-3.5 text-cyan-400" />
-          <span className="hidden sm:inline">Web Desktop</span>
-        </button>
-      </header>
-
-      {/* Main Content Area (Tab Views) */}
-      <main className="flex-1 overflow-y-auto relative bg-slate-950">
-        {activeTab === 'chat' && (
-          <div className="h-full">
-            <Chatbot
-              properties={properties}
-              agentName={agentName}
-              agentAvatar={agentAvatar}
-              agentInstruction={agentInstruction}
-              onBookProperty={onBookProperty}
-              onAddInference={onAddInference}
-              customerProfile={customerProfile}
-              onUpdateCustomerProfile={onUpdateCustomerProfile}
-            />
+        {/* Android Native Top Status Bar */}
+        <div className="bg-slate-900 px-4 py-1.5 flex items-center justify-between text-xs font-semibold text-slate-400 z-50 border-b border-slate-800/60 pt-2 md:pt-4">
+          <span>{currentTime || '12:00'}</span>
+          <div className="flex items-center space-x-2">
+            <Wifi className="w-3.5 h-3.5 text-cyan-400" />
+            <Signal className="w-3.5 h-3.5 text-slate-300" />
+            <Battery className="w-4 h-4 text-emerald-400" />
           </div>
-        )}
+        </div>
+
+        {/* Android Native Header Bar */}
+        <header className="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between z-40">
+          <div className="flex items-center space-x-3">
+            <div className="relative">
+              <img 
+                src={agentAvatar} 
+                alt={agentName} 
+                className="w-10 h-10 rounded-full object-cover ring-2 ring-cyan-500/50 shadow-md"
+              />
+              <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full ring-2 ring-slate-900"></span>
+            </div>
+            <div>
+              <h1 className="font-bold text-sm text-slate-100 flex items-center gap-1.5">
+                {agentName}
+                <span className="text-[10px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-1.5 py-0.2 rounded-full font-medium">
+                  Android App
+                </span>
+              </h1>
+              <p className="text-[11px] text-emerald-400 font-medium">Online • Concierge Trancoso</p>
+            </div>
+          </div>
+
+          <button
+            onClick={onSwitchToDesktop}
+            className="flex items-center space-x-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 transition"
+            title="Ver versión Escritorio"
+          >
+            <Monitor className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-[10px]">Desktop</span>
+          </button>
+        </header>
+
+        {/* Main Content Area (Tab Views) */}
+        <main className="flex-1 overflow-y-auto relative bg-slate-950">
+          {activeTab === 'chat' && (
+            <div className="h-full">
+              <Chatbot
+                properties={properties}
+                agentName={agentName}
+                agentAvatar={agentAvatar}
+                agentInstruction={agentInstruction}
+                onBookProperty={onBookProperty}
+                onAddInference={onAddInference}
+                customerProfile={customerProfile}
+                onUpdateCustomerProfile={onUpdateCustomerProfile}
+                hideHeader={true}
+              />
+            </div>
+          )}
 
         {activeTab === 'properties' && (
           <div className="p-4 pb-20 space-y-4">
@@ -255,6 +267,7 @@ export default function MobileApp({
         </button>
       </nav>
 
+      </div>
     </div>
   );
 }

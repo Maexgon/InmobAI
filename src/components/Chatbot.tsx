@@ -17,6 +17,7 @@ interface ChatbotProps {
   onAddInference: (inf: any) => void;
   customerProfile?: any;
   onUpdateCustomerProfile?: (updated: any) => void;
+  hideHeader?: boolean;
 }
 
 export default function Chatbot({
@@ -27,7 +28,8 @@ export default function Chatbot({
   onBookProperty,
   onAddInference,
   customerProfile,
-  onUpdateCustomerProfile
+  onUpdateCustomerProfile,
+  hideHeader = false
 }: ChatbotProps) {
   
   const [messages, setMessages] = useState<Message[]>([
@@ -359,31 +361,32 @@ export default function Chatbot({
     <div className="bg-white flex flex-col h-full w-full relative overflow-hidden">
       
       {/* 1. HEADER SECTION */}
-      <div className="p-4 bg-gradient-to-r from-[#111827] to-[#1F2937] text-white flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#10B981] border-2 border-[#111827] rounded-full animate-pulse"></span>
-            <img 
-              src={agentAvatar} 
-              alt={agentName} 
-              className="w-10 h-10 rounded-full border border-slate-700 object-cover" 
-              referrerPolicy="no-referrer"
-            />
+      {!hideHeader && (
+        <div className="p-4 bg-gradient-to-r from-[#111827] to-[#1F2937] text-white flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#10B981] border-2 border-[#111827] rounded-full animate-pulse"></span>
+              <img 
+                src={agentAvatar} 
+                alt={agentName} 
+                className="w-10 h-10 rounded-full border border-slate-700 object-cover" 
+                referrerPolicy="no-referrer"
+              />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm tracking-tight flex items-center gap-1.5 font-display">
+                {agentName} <Sparkles className="w-3.5 h-3.5 text-[#0EA5E9]" />
+              </h3>
+              <span className="text-[10px] text-emerald-400 font-semibold tracking-wider uppercase block">Concierge AI • Online</span>
+            </div>
           </div>
-          <div>
-            <h3 className="font-bold text-sm tracking-tight flex items-center gap-1.5 font-display">
-              {agentName} <Sparkles className="w-3.5 h-3.5 text-[#0EA5E9]" />
-            </h3>
-            <span className="text-[10px] text-emerald-400 font-semibold tracking-wider uppercase block">Concierge AI • Online</span>
-          </div>
-        </div>
 
-        {/* Brand identity indicator */}
-        <div className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-widest text-slate-400 bg-slate-800/60 px-2.5 py-1 rounded-lg border border-slate-700/50">
-          <SquareCode className="w-3.5 h-3.5 text-[#10B981]" />
-          <span>InmobAI Core</span>
+          <div className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-widest text-slate-400 bg-slate-800/60 px-2.5 py-1 rounded-lg border border-slate-700/50">
+            <SquareCode className="w-3.5 h-3.5 text-[#10B981]" />
+            <span>InmobAI Core</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 2. CHAT STREAM SECTION */}
       <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-[#F8FAFC]">
