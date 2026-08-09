@@ -196,8 +196,26 @@ Você deve responder rigorosamente no formato JSON especificado.
       timeout: 10000
     });
 
+    const conciseProperties = (properties || []).map((p: any) => ({
+      id: p.id,
+      title: p.title,
+      city: p.city,
+      pricePerNight: p.pricePerNight
+    }));
+
+    const fallbackInstruction = `Você é Maysa, Concierge de luxo em Trancoso e Arraial d'ajuda.
+Seja muito educada, humana e empática. Cumprimente pelo nome se souber, pergunte como a pessoa está e como pode ajudar.
+Respostas CURTAS (máximo 2 a 3 linhas). Retorne um JSON com esta estrutura:
+{
+  "reply": "Sua mensagem aqui",
+  "extractedCustomerInfo": {},
+  "inferredAttributes": { "communication_style": "breve", "budget": "alto_padrao", "urgency": "media", "evidence": "Conversa concierge" },
+  "suggestedPropertyIds": []
+}
+Catálogo disponível: ${JSON.stringify(conciseProperties)}`;
+
     const openRouterMessages = [
-      { role: 'system', content: chatInstruction },
+      { role: 'system', content: fallbackInstruction },
       ...messages.map((m: any) => ({
         role: m.role === 'client' ? 'user' : 'assistant',
         content: m.text
