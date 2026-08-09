@@ -295,15 +295,25 @@ export default function Chatbot({
     }
   };
 
-  // Real Web Speech Recognition (Microphone STT)
+  const fullTranscriptRef = useRef<string>('');
+  const silenceTimerRef = useRef<any>(null);
+
+  // Real Web Speech Recognition (Microphone STT - Long Duration Support)
   const handleVoiceNoteClick = () => {
     if (!lgpdAccepted) return;
 
     if (isRecording) {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       if (recognitionRef.current) {
         try { recognitionRef.current.stop(); } catch (err) {}
       }
       setIsRecording(false);
+      
+      const finalTranscript = fullTranscriptRef.current.trim();
+      if (finalTranscript) {
+        handleSendMessage(finalTranscript, true);
+        fullTranscriptRef.current = '';
+      }
       return;
     }
 
@@ -315,9 +325,11 @@ export default function Chatbot({
     }
 
     try {
+      fullTranscriptRef.current = '';
       const recognition = new SpeechRecognition();
       recognition.lang = 'pt-BR';
-      recognition.interimResults = false;
+      recognition.continuous = true; // Allow long, continuous speech
+      recognition.interimResults = true; // Show real-time progress
       recognition.maxAlternatives = 1;
 
       recognition.onstart = () => {
@@ -326,16 +338,34 @@ export default function Chatbot({
       };
 
       recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0]?.transcript;
-        if (transcript) {
-          setInputMessage(transcript);
-          handleSendMessage(transcript, true);
+        let currentTranscript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          currentTranscript += event.results[i][0].transcript + ' ';
         }
+        
+        fullTranscriptRef.current = currentTranscript;
+        setInputMessage(currentTranscript);
+
+        // Reset silence timer on every new speech chunk (2.5 seconds of silence auto-submits)
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = setTimeout(() => {
+          if (recognitionRef.current) {
+            try { recognitionRef.current.stop(); } catch (e) {}
+          }
+          setIsRecording(false);
+          const textToSend = fullTranscriptRef.current.trim();
+          if (textToSend) {
+            handleSendMessage(textToSend, true);
+            fullTranscriptRef.current = '';
+          }
+        }, 2500);
       };
 
       recognition.onerror = (event: any) => {
         console.warn('Speech recognition error:', event.error);
-        setIsRecording(false);
+        if (event.error !== 'no-speech') {
+          setIsRecording(false);
+        }
       };
 
       recognition.onend = () => {
