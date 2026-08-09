@@ -175,8 +175,11 @@ export default function Chatbot({
     }
   };
 
+  const [isVoiceInputMode, setIsVoiceInputMode] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
   // Chat submission logic with memory persistence
-  const handleSendMessage = async (textToSend: string) => {
+  const handleSendMessage = async (textToSend: string, isFromVoice: boolean = false) => {
     if (!textToSend.trim() || isAiLoading) return;
 
     const userMsg: Message = {
@@ -267,8 +270,10 @@ export default function Chatbot({
         };
         setMessages(prev => [...prev, modelMsg]);
 
-        if (isRecording) {
+        // Automatically play voice response if the user sent message via microphone!
+        if (isFromVoice || isVoiceInputMode) {
           speakMessage(modelMsg.id, data.reply);
+          setIsVoiceInputMode(false);
         }
       }
     } catch (e) {
@@ -290,21 +295,58 @@ export default function Chatbot({
     }
   };
 
-  // Simulate Voice notes recording
+  // Real Web Speech Recognition (Microphone STT)
   const handleVoiceNoteClick = () => {
     if (!lgpdAccepted) return;
+
     if (isRecording) {
-      // Stop recording and send simulated text
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (err) {}
+      }
       setIsRecording(false);
-      const simulatedVoicePrompts = [
-        'Olá Maysa, estou procurando uma casa com 4 quartos para alugar em Trancoso para o final de semana.',
-        'Quero uma casa em Arraial d\'ajuda com piscina e que seja pet friendly, você tem?',
-        'Qual o valor aproximado para alugar a Villa Trancoso Paradise no feriado de setembro?'
-      ];
-      const randomPrompt = simulatedVoicePrompts[Math.floor(Math.random() * simulatedVoicePrompts.length)];
-      handleSendMessage(randomPrompt);
-    } else {
-      setIsRecording(true);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert('Seu navegador não possui suporte ao microfone em tempo real. Recomendamos usar Google Chrome ou Microsoft Edge.');
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'pt-BR';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        setIsRecording(true);
+        setIsVoiceInputMode(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0]?.transcript;
+        if (transcript) {
+          setInputMessage(transcript);
+          handleSendMessage(transcript, true);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error);
+        setIsRecording(false);
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error('Failed to start speech recognition:', err);
+      setIsRecording(false);
     }
   };
 
@@ -512,7 +554,7 @@ export default function Chatbot({
       {/* 4. FOOTER & INPUT CONTROLS */}
       {lgpdAccepted && (
         <div className="p-4 bg-white border-t border-slate-200/80 flex items-center gap-3 relative z-10">
-          {/* Simulated Mic button */}
+          {/* Real Mic button */}
           <button 
             onClick={handleVoiceNoteClick}
             className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 border ${
@@ -520,7 +562,7 @@ export default function Chatbot({
                 ? 'bg-red-500 border-red-500 text-white animate-pulse shadow-lg shadow-red-500/20' 
                 : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
             }`}
-            title="Enviar nota de voz (Simulação)"
+            title="Falar por Voz (Reconhecimento de Voz real)"
           >
             <Mic className="w-5 h-5" />
           </button>
@@ -533,7 +575,7 @@ export default function Chatbot({
                 <span className="w-1.5 h-5 bg-red-500 rounded animate-bounce [animation-delay:0.2s]"></span>
                 <span className="w-1.5 h-2 bg-red-500 rounded animate-bounce [animation-delay:0.4s]"></span>
               </span>
-              <span>Gravando áudio... Clique para enviar e transcrever!</span>
+              <span>Ouvindo sua voz... Fale agora com a Maysa!</span>
             </div>
           ) : (
             <input 
