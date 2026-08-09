@@ -170,26 +170,24 @@ Você deve responder rigorosamente no formato JSON especificado.
     console.error('CRITICAL CHAT ERROR:', error);
     console.warn('Chat error (using smart fallback demo response):', error.message);
     
-    // Smart offline/demo fallback when no valid API key is present
-    const lastUserMsg = messages[messages.length - 1]?.text || '';
-    const isBeach = lastUserMsg.toLowerCase().includes('praia') || lastUserMsg.toLowerCase().includes('areia');
-    const isArraial = lastUserMsg.toLowerCase().includes('arraial');
-
-    const suggestedId = isArraial ? 'prop-2' : (isBeach ? 'prop-1' : 'prop-3');
+    let fallbackMessage = 'Desculpe, estou enfrentando instabilidades na conexão com a central. Por favor, aguarde um momento e tente novamente.';
     
+    if (error.status === 429) {
+       fallbackMessage = 'Desculpe, nosso sistema está recebendo muitas requisições no momento. Por favor, aguarde um minuto e tente novamente.';
+    } else if (error.status === 400 || error.status === 401) {
+       fallbackMessage = 'Desculpe, ocorreu um erro de autenticação interna (Chave de API).';
+    }
+
     res.json({
-      reply: `Olá! Compreendi perfeitamente. Em ${isArraial ? "Arraial d'ajuda" : "Trancoso"}, oferecemos casas maravilhosas com mordomia completa. Qual a data exata da sua viagem e quantos hóspedes virão com você?`,
-      extractedCustomerInfo: {
-        preferredCity: isArraial ? "Arraial d'ajuda" : "Trancoso",
-        beachPreference: isBeach ? "pé_na_areia" : "centro"
-      },
+      reply: fallbackMessage,
+      extractedCustomerInfo: {},
       inferredAttributes: {
-        communication_style: "breve_e_direto",
-        budget: "alto_padrao",
-        urgency: "media",
-        evidence: "Cliente interessado em locação na Bahia."
+        communication_style: "indefinido",
+        budget: "indefinido",
+        urgency: "indefinido",
+        evidence: "Erro de sistema/cota"
       },
-      suggestedPropertyIds: [suggestedId]
+      suggestedPropertyIds: []
     });
   }
 });
