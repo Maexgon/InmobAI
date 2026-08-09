@@ -213,11 +213,29 @@ Você deve responder rigorosamente no formato JSON especificado.
           response_format: { type: 'json_object' }
         }, { timeout: 3500 });
 
-        const content = orResponse.choices[0]?.message?.content;
+        let content = orResponse.choices[0]?.message?.content;
         if (content) {
-          console.log(`=== [TRACE 4/4 SUCCESS] Resposta obtida com sucesso via ${modelId}! ===`);
-          successResponse = JSON.parse(content);
-          break;
+          content = content.trim();
+          if (content.startsWith('```')) {
+            content = content.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+          }
+          
+          const parsed = JSON.parse(content);
+          if (parsed && (parsed.reply || parsed.message || parsed.text)) {
+            console.log(`=== [TRACE 4/4 SUCCESS] Resposta obtida com sucesso via ${modelId}! ===`);
+            successResponse = {
+              reply: parsed.reply || parsed.message || parsed.text || 'Olá, como posso ajudar você hoje?',
+              extractedCustomerInfo: parsed.extractedCustomerInfo || {},
+              inferredAttributes: parsed.inferredAttributes || {
+                communication_style: "breve",
+                budget: "alto_padrao",
+                urgency: "media",
+                evidence: "Conversa com assistente"
+              },
+              suggestedPropertyIds: Array.isArray(parsed.suggestedPropertyIds) ? parsed.suggestedPropertyIds : []
+            };
+            break;
+          }
         }
       } catch (orModelError: any) {
         console.warn(`=== [TRACE MODEL FAIL] Modelo ${modelId} falhou. Erro: ${orModelError.message} ===`);
