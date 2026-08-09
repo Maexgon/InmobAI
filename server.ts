@@ -211,7 +211,7 @@ Você deve responder rigorosamente no formato JSON especificado.
           model: modelId,
           messages: openRouterMessages as any,
           response_format: { type: 'json_object' }
-        });
+        }, { timeout: 3500 });
 
         const content = orResponse.choices[0]?.message?.content;
         if (content) {
