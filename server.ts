@@ -424,22 +424,22 @@ app.post('/api/book', async (req, res) => {
     }
 
     const mailOptions = {
-      from: \`"InmobAI Concierge" <\${process.env.SMTP_USER}>\`,
+      from: `"InmobAI Concierge" <${process.env.SMTP_USER}>`,
       to: process.env.ADMIN_EMAIL || process.env.SMTP_USER, // Notificar al admin
-      subject: \`NOVA RESERVA - \${propertyTitle} - \${clientName}\`,
-      html: \`
+      subject: `NOVA RESERVA - ${propertyTitle} - ${clientName}`,
+      html: `
         <h2>Nova Solicitação de Reserva</h2>
-        <p><strong>Propriedade:</strong> \${propertyTitle} (\${propertyId})</p>
-        <p><strong>Check-In:</strong> \${checkIn}</p>
-        <p><strong>Check-Out:</strong> \${checkOut}</p>
+        <p><strong>Propriedade:</strong> ${propertyTitle} (${propertyId})</p>
+        <p><strong>Check-In:</strong> ${checkIn}</p>
+        <p><strong>Check-Out:</strong> ${checkOut}</p>
         <hr/>
         <h3>Dados do Hóspede</h3>
-        <p><strong>Nome:</strong> \${clientName}</p>
-        <p><strong>DNI/Passaporte:</strong> \${clientDni}</p>
-        <p><strong>Email:</strong> \${clientEmail}</p>
-        <p><strong>Telefone:</strong> \${clientPhone}</p>
-        <p><strong>Pedidos Especiais:</strong> \${specialRequests || 'Nenhum'}</p>
-      \`
+        <p><strong>Nome:</strong> ${clientName}</p>
+        <p><strong>DNI/Passaporte:</strong> ${clientDni}</p>
+        <p><strong>Email:</strong> ${clientEmail}</p>
+        <p><strong>Telefone:</strong> ${clientPhone}</p>
+        <p><strong>Pedidos Especiais:</strong> ${specialRequests || 'Nenhum'}</p>
+      `
     };
 
     await transporter.sendMail(mailOptions);
