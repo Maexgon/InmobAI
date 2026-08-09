@@ -104,6 +104,9 @@ Você deve responder rigorosamente no formato JSON especificado.
 
   try {
 
+    console.log(`=== [TRACE 1/4] /api/chat recebido. Mensagens: ${messages.length} ===`);
+    console.log('=== [TRACE 2/4] Enviando solicitação para Gemini Primário... ===');
+
     const response = await ai.models.generateContent({
       model: 'gemini-3.6-flash',
       contents: formattedHistory.length > 0 ? formattedHistory : [{ role: 'user', parts: [{ text: 'Olá' }] }],
@@ -167,64 +170,85 @@ Você deve responder rigorosamente no formato JSON especificado.
       }
     });
 
+    console.log('=== [TRACE SUCCESS] Resposta gerada com sucesso pelo Gemini Primário! ===');
     const resultText = response.text || '{}';
     res.json(JSON.parse(resultText));
   } catch (error: any) {
-    console.error('CRITICAL CHAT ERROR:', error);
-    console.warn('Chat error (using smart fallback demo response):', error.message);
+    console.warn(`=== [TRACE FALLBACK TRIGGERED] Gemini falhou (Status ${error.status || 'Erro'}). Razão: ${error.message} ===`);
     
-    try {
-      console.log('[Gemini fallback] Tentando com OpenRouter...');
-      
-      const openai = new OpenAI({
-        baseURL: "https://openrouter.ai/api/v1",
-        apiKey: process.env.OPENROUTER_API_KEY,
-        defaultHeaders: {
-          "HTTP-Referer": "http://localhost:3000",
-          "X-Title": "InmobAI",
-        },
-        timeout: 8000
-      });
+    // We try non-Google free models on OpenRouter to avoid upstream Google rate limits
+    const candidateModels = [
+      'nvidia/nemotron-nano-9b-v2:free',
+      'openai/gpt-oss-20b:free',
+      'poolside/laguna-s-2.1:free',
+      'inclusionai/ling-3.0-tiny:free'
+    ];
 
-      const openRouterMessages = [
-        { role: 'system', content: chatInstruction },
-        ...messages.map((m: any) => ({
-          role: m.role === 'client' ? 'user' : 'assistant',
-          content: m.text
-        }))
-      ];
+    let successResponse = null;
 
-      const orResponse = await openai.chat.completions.create({
-        model: 'google/gemma-4-31b-it:free',
-        messages: openRouterMessages as any,
-        response_format: { type: 'json_object' }
-      });
+    const openai = new OpenAI({
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: process.env.OPENROUTER_API_KEY,
+      defaultHeaders: {
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "InmobAI",
+      },
+      timeout: 10000
+    });
 
-      const orResultText = orResponse.choices[0]?.message?.content || '{}';
-      res.json(JSON.parse(orResultText));
-    } catch (orError: any) {
-      console.error('OPENROUTER FALLBACK ERROR:', orError);
-      
-      let fallbackMessage = 'Desculpe, estou enfrentando instabilidades na conexão com a central. Por favor, aguarde um momento e tente novamente.';
-      
-      if (error.status === 429) {
-         fallbackMessage = 'Desculpe, nosso sistema está recebendo muitas requisições no momento. Por favor, aguarde um minuto e tente novamente.';
-      } else if (error.status === 400 || error.status === 401) {
-         fallbackMessage = 'Desculpe, ocorreu um erro de autenticação interna (Chave de API).';
+    const openRouterMessages = [
+      { role: 'system', content: chatInstruction },
+      ...messages.map((m: any) => ({
+        role: m.role === 'client' ? 'user' : 'assistant',
+        content: m.text
+      }))
+    ];
+
+    for (const modelId of candidateModels) {
+      try {
+        console.log(`=== [TRACE 3/4] Tentando modelo Fallback OpenRouter: ${modelId}... ===`);
+        const orResponse = await openai.chat.completions.create({
+          model: modelId,
+          messages: openRouterMessages as any,
+          response_format: { type: 'json_object' }
+        });
+
+        const content = orResponse.choices[0]?.message?.content;
+        if (content) {
+          console.log(`=== [TRACE 4/4 SUCCESS] Resposta obtida com sucesso via ${modelId}! ===`);
+          successResponse = JSON.parse(content);
+          break;
+        }
+      } catch (orModelError: any) {
+        console.warn(`=== [TRACE MODEL FAIL] Modelo ${modelId} falhou. Erro: ${orModelError.message} ===`);
       }
-
-      res.json({
-        reply: fallbackMessage,
-        extractedCustomerInfo: {},
-        inferredAttributes: {
-          communication_style: "indefinido",
-          budget: "indefinido",
-          urgency: "indefinido",
-          evidence: "Erro de sistema/cota"
-        },
-        suggestedPropertyIds: []
-      });
     }
+
+    if (successResponse) {
+      return res.json(successResponse);
+    }
+
+    console.error('=== [TRACE ALL FAIL] Todos os modelos Gemini e OpenRouter falharam. ===');
+    
+    let fallbackMessage = 'Desculpe, estou enfrentando instabilidades na conexão com a central. Por favor, aguarde um momento e tente novamente.';
+    
+    if (error.status === 429) {
+       fallbackMessage = 'Desculpe, nosso sistema está recebendo muitas requisições no momento. Por favor, aguarde um minuto e tente novamente.';
+    } else if (error.status === 400 || error.status === 401) {
+       fallbackMessage = 'Desculpe, ocorreu um erro de autenticação interna (Chave de API).';
+    }
+
+    res.json({
+      reply: fallbackMessage,
+      extractedCustomerInfo: {},
+      inferredAttributes: {
+        communication_style: "indefinido",
+        budget: "indefinido",
+        urgency: "indefinido",
+        evidence: "Erro de sistema/cota"
+      },
+      suggestedPropertyIds: []
+    });
   }
 });
 
