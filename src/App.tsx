@@ -260,6 +260,22 @@ export default function App() {
     );
   }
 
+  if (currentTab === 'android-app') {
+    return (
+      <MobileApp
+        properties={properties}
+        agentName={companyConfig.agentName}
+        agentAvatar={companyConfig.agentAvatar}
+        agentInstruction={companyConfig.agentInstruction}
+        onBookProperty={handleBookProperty}
+        onAddInference={handleAddInference}
+        customerProfile={customers[0]}
+        onUpdateCustomerProfile={handleUpdateCustomerProfile}
+        onSwitchToDesktop={() => setCurrentTab('client-portal')}
+      />
+    );
+  }
+
   return (
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans">
       
@@ -378,21 +394,6 @@ export default function App() {
                 />
               )}
               
-            {/* APP MOBILE ANDROID FULLSCREEN EXPERIENCE */}
-            {currentTab === 'android-app' ? (
-              <MobileApp
-                properties={properties}
-                agentName={companyConfig.agentName}
-                agentAvatar={companyConfig.agentAvatar}
-                agentInstruction={companyConfig.agentInstruction}
-                onBookProperty={handleBookProperty}
-                onAddInference={handleAddInference}
-                customerProfile={customers[0]}
-                onUpdateCustomerProfile={handleUpdateCustomerProfile}
-                onSwitchToDesktop={() => setCurrentTab('client-portal')}
-              />
-            ) : (
-              <>
               {/* CLIENT-PORTAL DISCOVERY MODE WITH MAP GROUNDING */}
               {currentTab === 'client-portal' && (
                 <div className="space-y-8">
@@ -568,9 +569,6 @@ export default function App() {
                   <TelegramSimulator />
                 </div>
               )}
-
-              </>
-            )}
 
             </div>
           )}
