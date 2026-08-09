@@ -176,17 +176,33 @@ export default function Chatbot({
   };
 
   const [isVoiceInputMode, setIsVoiceInputMode] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recognitionRef = useRef<any>(null);
+  const fullTranscriptRef = useRef<string>('');
+  const silenceTimerRef = useRef<any>(null);
+  const maxTimerRef = useRef<any>(null);
+  const intervalRef = useRef<any>(null);
+  const isSubmittingRef = useRef<boolean>(false);
 
-  // Chat submission logic with memory persistence
+  const stopAndClearTimers = () => {
+    if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null; }
+    if (maxTimerRef.current) { clearTimeout(maxTimerRef.current); maxTimerRef.current = null; }
+    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
+  };
+
+  // Chat submission logic with memory persistence and duplicate submission guard
   const handleSendMessage = async (textToSend: string, isFromVoice: boolean = false) => {
-    if (!textToSend.trim() || isAiLoading) return;
+    const trimmed = textToSend.trim();
+    if (!trimmed || isAiLoading || isSubmittingRef.current) return;
+
+    isSubmittingRef.current = true;
+    stopAndClearTimers();
 
     const userMsg: Message = {
       id: 'msg-' + Date.now(),
       conversationId: 'active-conv',
       sender: 'client',
-      text: textToSend,
+      text: trimmed,
       createdAt: new Date().toISOString()
     };
 
@@ -219,7 +235,7 @@ export default function Chatbot({
           role: m.sender === 'client' ? 'client' : 'agent',
           text: m.text
         }));
-      chatHistory.push({ role: 'client', text: textToSend });
+      chatHistory.push({ role: 'client', text: trimmed });
 
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -292,18 +308,16 @@ export default function Chatbot({
     } finally {
       setIsAiLoading(false);
       setIsRecording(false);
+      isSubmittingRef.current = false;
     }
   };
 
-  const fullTranscriptRef = useRef<string>('');
-  const silenceTimerRef = useRef<any>(null);
-
-  // Real Web Speech Recognition (Microphone STT - Long Duration Support)
+  // Real Web Speech Recognition (Microphone STT - 60 Seconds Max Duration Support)
   const handleVoiceNoteClick = () => {
     if (!lgpdAccepted) return;
 
     if (isRecording) {
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      stopAndClearTimers();
       if (recognitionRef.current) {
         try { recognitionRef.current.stop(); } catch (err) {}
       }
@@ -326,15 +340,39 @@ export default function Chatbot({
 
     try {
       fullTranscriptRef.current = '';
+      setRecordingSeconds(0);
+      stopAndClearTimers();
+
       const recognition = new SpeechRecognition();
       recognition.lang = 'pt-BR';
-      recognition.continuous = true; // Allow long, continuous speech
-      recognition.interimResults = true; // Show real-time progress
+      recognition.continuous = true;
+      recognition.interimResults = true;
       recognition.maxAlternatives = 1;
 
       recognition.onstart = () => {
         setIsRecording(true);
         setIsVoiceInputMode(true);
+
+        // 1-second countdown timer
+        intervalRef.current = setInterval(() => {
+          setRecordingSeconds(prev => {
+            if (prev >= 59) {
+              // 60-second limit reached, auto submit
+              stopAndClearTimers();
+              if (recognitionRef.current) {
+                try { recognitionRef.current.stop(); } catch (e) {}
+              }
+              setIsRecording(false);
+              const textToSend = fullTranscriptRef.current.trim();
+              if (textToSend) {
+                handleSendMessage(textToSend, true);
+                fullTranscriptRef.current = '';
+              }
+              return 60;
+            }
+            return prev + 1;
+          });
+        }, 1000);
       };
 
       recognition.onresult = (event: any) => {
@@ -346,9 +384,10 @@ export default function Chatbot({
         fullTranscriptRef.current = currentTranscript;
         setInputMessage(currentTranscript);
 
-        // Reset silence timer on every new speech chunk (2.5 seconds of silence auto-submits)
+        // 3-second silence auto-submit timer
         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
         silenceTimerRef.current = setTimeout(() => {
+          stopAndClearTimers();
           if (recognitionRef.current) {
             try { recognitionRef.current.stop(); } catch (e) {}
           }
@@ -358,17 +397,19 @@ export default function Chatbot({
             handleSendMessage(textToSend, true);
             fullTranscriptRef.current = '';
           }
-        }, 2500);
+        }, 3000);
       };
 
       recognition.onerror = (event: any) => {
         console.warn('Speech recognition error:', event.error);
         if (event.error !== 'no-speech') {
+          stopAndClearTimers();
           setIsRecording(false);
         }
       };
 
       recognition.onend = () => {
+        stopAndClearTimers();
         setIsRecording(false);
       };
 
@@ -376,6 +417,7 @@ export default function Chatbot({
       recognition.start();
     } catch (err) {
       console.error('Failed to start speech recognition:', err);
+      stopAndClearTimers();
       setIsRecording(false);
     }
   };
@@ -605,7 +647,7 @@ export default function Chatbot({
                 <span className="w-1.5 h-5 bg-red-500 rounded animate-bounce [animation-delay:0.2s]"></span>
                 <span className="w-1.5 h-2 bg-red-500 rounded animate-bounce [animation-delay:0.4s]"></span>
               </span>
-              <span>Ouvindo sua voz... Fale agora com a Maysa!</span>
+              <span>Gravando voz... ({recordingSeconds}s / 60s max) - Fale agora com a Maysa!</span>
             </div>
           ) : (
             <input 
