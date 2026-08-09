@@ -65,22 +65,22 @@ function pcmToWav(pcmData: Buffer, sampleRate = 24000, numChannels = 1, bitsPerS
 // 1. Chatbot endpoint with Structured JSON, Cognitive inferences & Automatic Customer Profile Memory Extraction
 app.post('/api/chat', async (req, res) => {
   const { messages = [], systemInstruction, properties, customerProfile } = req.body || {};
-  try {
-    const formattedHistory = messages.map((m: any) => ({
-      role: m.role === 'client' ? 'user' : 'model',
-      parts: [{ text: m.text }]
-    }));
 
-    // Inject properties catalog & existing customer memory into AI context
-    const propertiesContext = `
+  const formattedHistory = messages.map((m: any) => ({
+    role: m.role === 'client' ? 'user' : 'model',
+    parts: [{ text: m.text }]
+  }));
+
+  // Inject properties catalog & existing customer memory into AI context
+  const propertiesContext = `
 Abaixo está o catálogo de imóveis disponíveis em Trancoso e Arraial d'ajuda:
 ${JSON.stringify(properties, null, 2)}
 
 MEMÓRIA ATUAL DO CLIENTE CONHECIDO (SE HOUVER):
 ${customerProfile ? JSON.stringify(customerProfile, null, 2) : 'Nenhum dado prévio registrado.'}
-    `;
+  `;
 
-    const chatInstruction = `
+  const chatInstruction = `
 ${systemInstruction}
 
 DIRETRIZES DE ATENDIMENTO CONSULTIVO E EXTRAÇÃO DE MEMÓRIA (CONCIERGE DE LUXO):
@@ -101,6 +101,8 @@ ${propertiesContext}
 
 Você deve responder rigorosamente no formato JSON especificado.
 `;
+
+  try {
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.6-flash',
