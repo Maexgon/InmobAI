@@ -10,6 +10,7 @@ import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 import textToSpeech from '@google-cloud/text-to-speech';
 import nodemailer from 'nodemailer';
+import OpenAI from 'openai';
 
 dotenv.config();
 
@@ -170,25 +171,53 @@ Você deve responder rigorosamente no formato JSON especificado.
     console.error('CRITICAL CHAT ERROR:', error);
     console.warn('Chat error (using smart fallback demo response):', error.message);
     
-    let fallbackMessage = 'Desculpe, estou enfrentando instabilidades na conexão com a central. Por favor, aguarde um momento e tente novamente.';
-    
-    if (error.status === 429) {
-       fallbackMessage = 'Desculpe, nosso sistema está recebendo muitas requisições no momento. Por favor, aguarde um minuto e tente novamente.';
-    } else if (error.status === 400 || error.status === 401) {
-       fallbackMessage = 'Desculpe, ocorreu um erro de autenticação interna (Chave de API).';
-    }
+    try {
+      console.log('[Gemini fallback] Tentando com OpenRouter...');
+      
+      const openai = new OpenAI({
+        baseURL: "https://openrouter.ai/api/v1",
+        apiKey: process.env.OPENROUTER_API_KEY
+      });
 
-    res.json({
-      reply: fallbackMessage,
-      extractedCustomerInfo: {},
-      inferredAttributes: {
-        communication_style: "indefinido",
-        budget: "indefinido",
-        urgency: "indefinido",
-        evidence: "Erro de sistema/cota"
-      },
-      suggestedPropertyIds: []
-    });
+      const openRouterMessages = [
+        { role: 'system', content: chatInstruction },
+        ...messages.map((m: any) => ({
+          role: m.role === 'client' ? 'user' : 'assistant',
+          content: m.text
+        }))
+      ];
+
+      const orResponse = await openai.chat.completions.create({
+        model: 'google/gemini-2.0-flash-lite-preview-02-05:free',
+        messages: openRouterMessages as any,
+        response_format: { type: 'json_object' }
+      });
+
+      const orResultText = orResponse.choices[0]?.message?.content || '{}';
+      res.json(JSON.parse(orResultText));
+    } catch (orError: any) {
+      console.error('OPENROUTER FALLBACK ERROR:', orError);
+      
+      let fallbackMessage = 'Desculpe, estou enfrentando instabilidades na conexão com a central. Por favor, aguarde um momento e tente novamente.';
+      
+      if (error.status === 429) {
+         fallbackMessage = 'Desculpe, nosso sistema está recebendo muitas requisições no momento. Por favor, aguarde um minuto e tente novamente.';
+      } else if (error.status === 400 || error.status === 401) {
+         fallbackMessage = 'Desculpe, ocorreu um erro de autenticação interna (Chave de API).';
+      }
+
+      res.json({
+        reply: fallbackMessage,
+        extractedCustomerInfo: {},
+        inferredAttributes: {
+          communication_style: "indefinido",
+          budget: "indefinido",
+          urgency: "indefinido",
+          evidence: "Erro de sistema/cota"
+        },
+        suggestedPropertyIds: []
+      });
+    }
   }
 });
 
