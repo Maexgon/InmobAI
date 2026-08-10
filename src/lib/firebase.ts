@@ -18,7 +18,7 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { Property, Customer, Opportunity, CompanyConfig, Booking, ConciergeTask, Conversation, Message, CustomerInference, Seller } from '../types';
+import { Property, Customer, Opportunity, CompanyConfig, Booking, ConciergeTask, Conversation, Message, CustomerInference, Seller, OwnerPayout } from '../types';
 
 // Initialize Firebase with custom databaseId 'inmobdb'
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
