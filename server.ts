@@ -201,33 +201,110 @@ Você deve responder rigorosamente no formato JSON especificado.
   } catch (error: any) {
     console.warn(`=== [TRACE FALLBACK TRIGGERED] Gemini falhou (Status ${error.status || 'Erro'}). Razão: ${error.message} ===`);
     
-    const candidateModels = [
-      'nvidia/nemotron-nano-9b-v2:free',
-      'openai/gpt-oss-20b:free',
-      'poolside/laguna-s-2.1:free',
-      'inclusionai/ling-3.0-tiny:free'
-    ];
-
     let successResponse = null;
 
-    const openai = new OpenAI({
-      baseURL: "https://openrouter.ai/api/v1",
-      apiKey: process.env.OPENROUTER_API_KEY,
-      defaultHeaders: {
-        "HTTP-Referer": "http://localhost:3000",
-        "X-Title": "InmobAI",
-      },
-      timeout: 10000
-    });
+    // Fallback 1: Try gemini-3.1-flash-lite using the same Gemini SDK
+    try {
+      console.log('=== [TRACE FALLBACK] Tentando modelo Gemini Alternativo (gemini-3.1-flash-lite)... ===');
+      const fallbackResponse = await ai.models.generateContent({
+        model: 'gemini-3.1-flash-lite',
+        contents: formattedHistory.length > 0 ? formattedHistory : [{ role: 'user', parts: [{ text: 'Olá' }] }],
+        config: {
+          tools: [{ googleMaps: {} }],
+          systemInstruction: chatInstruction,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              reply: {
+                type: Type.STRING,
+                description: "Texto de resposta conversacional, elegante e profissional em português o espanhol"
+              },
+              extractedCustomerInfo: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  email: { type: Type.STRING },
+                  phone: { type: Type.STRING },
+                  guestsCount: { type: Type.NUMBER },
+                  tripType: { type: Type.STRING },
+                  travelCompanions: { type: Type.STRING },
+                  hasChildren: { type: Type.BOOLEAN },
+                  budgetPerNight: { type: Type.NUMBER },
+                  preferredCity: { type: Type.STRING },
+                  beachPreference: { type: Type.STRING },
+                  hasCar: { type: Type.BOOLEAN },
+                  lgpdConsent: { type: Type.BOOLEAN }
+                },
+                description: "Dados concretos informados pelo cliente nesta mensagem ou no histórico para atualização no CRM"
+              },
+              inferredAttributes: {
+                type: Type.OBJECT,
+                properties: {
+                  communication_style: {
+                    type: Type.STRING,
+                    description: "estilo detectado (Ex: breve_e_direto, detalhado, informal, formal)"
+                  },
+                  budget: {
+                    type: Type.STRING,
+                    description: "faixa de preço detectada (Ex: alto_padrao, medio, economico)"
+                  },
+                  urgency: {
+                    type: Type.STRING,
+                    description: "nível de urgência (Ex: alta, media, baixa)"
+                  },
+                  evidence: {
+                    type: Type.STRING,
+                    description: "Explicação breve de qual frase ou comportamento originou esta inferência"
+                  }
+                },
+                required: ["communication_style", "budget", "urgency", "evidence"]
+              },
+              suggestedPropertyIds: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "Lista de IDs dos imóveis sugeridos"
+              }
+            },
+            required: ["reply", "inferredAttributes", "suggestedPropertyIds"]
+          }
+        }
+      });
 
-    const conciseProperties = (properties || []).map((p: any) => ({
-      id: p.id,
-      title: p.title,
-      city: p.city,
-      pricePerNight: p.pricePerNight
-    }));
+      const resultText = fallbackResponse.text || '{}';
+      successResponse = JSON.parse(resultText);
+      console.log('=== [TRACE FALLBACK SUCCESS] Resposta gerada com sucesso pelo Gemini Alternativo! ===');
+    } catch (fallbackGeminiError: any) {
+      console.warn(`=== [TRACE FALLBACK FAIL] Gemini Alternativo também falhou: ${fallbackGeminiError.message} ===`);
+    }
 
-    const fallbackInstruction = `Você é Maysa, Concierge de luxo em Trancoso e Arraial d'ajuda.
+    // Fallback 2: Try OpenRouter if API key is set
+    if (!successResponse && process.env.OPENROUTER_API_KEY) {
+      const candidateModels = [
+        'nvidia/nemotron-nano-9b-v2:free',
+        'openai/gpt-oss-20b:free',
+        'poolside/laguna-s-2.1:free',
+        'inclusionai/ling-3.0-tiny:free'
+      ];
+
+      const openai = new OpenAI({
+        baseURL: "https://openrouter.ai/api/v1",
+        apiKey: process.env.OPENROUTER_API_KEY,
+        defaultHeaders: {
+          "HTTP-Referer": "http://localhost:3000",
+          "X-Title": "InmobAI",
+        },
+        timeout: 10000
+      });
+
+      const conciseProperties = (properties || []).map((p: any) => ({
+        id: p.id,
+        title: p.title,
+        city: p.city,
+        pricePerNight: p.pricePerNight
+      }));
+
+      const fallbackInstruction = `Você é Maysa, Concierge de luxo em Trancoso e Arraial d'ajuda.
 REGRAS RÍGIDAS:
 - NUNCA mencione IDs como (ID: prop-1) nem termos técnicos no texto!
 - NUNCA ofereça aluguel de carros ou serviços não prestados.
@@ -248,49 +325,50 @@ Retorne JSON:
 }
 Catálogo: ${JSON.stringify(conciseProperties)}`;
 
-    const openRouterMessages = [
-      { role: 'system', content: fallbackInstruction },
-      ...messages.map((m: any) => ({
-        role: m.role === 'client' ? 'user' : 'assistant',
-        content: m.text
-      }))
-    ];
+      const openRouterMessages = [
+        { role: 'system', content: fallbackInstruction },
+        ...messages.map((m: any) => ({
+          role: m.role === 'client' ? 'user' : 'assistant',
+          content: m.text
+        }))
+      ];
 
-    for (const modelId of candidateModels) {
-      try {
-        console.log(`=== [TRACE 3/4] Tentando modelo Fallback OpenRouter: ${modelId}... ===`);
-        const orResponse = await openai.chat.completions.create({
-          model: modelId,
-          messages: openRouterMessages as any,
-          response_format: { type: 'json_object' }
-        }, { timeout: 3500 });
+      for (const modelId of candidateModels) {
+        try {
+          console.log(`=== [TRACE 3/4] Tentando modelo Fallback OpenRouter: ${modelId}... ===`);
+          const orResponse = await openai.chat.completions.create({
+            model: modelId,
+            messages: openRouterMessages as any,
+            response_format: { type: 'json_object' }
+          }, { timeout: 3500 });
 
-        let content = orResponse.choices[0]?.message?.content;
-        if (content) {
-          content = content.trim();
-          if (content.startsWith('```')) {
-            content = content.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+          let content = orResponse.choices[0]?.message?.content;
+          if (content) {
+            content = content.trim();
+            if (content.startsWith('```')) {
+              content = content.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+            }
+            
+            const parsed = JSON.parse(content);
+            if (parsed && (parsed.reply || parsed.message || parsed.text)) {
+              console.log(`=== [TRACE 4/4 SUCCESS] Resposta obtida com sucesso via ${modelId}! ===`);
+              successResponse = {
+                reply: parsed.reply || parsed.message || parsed.text || 'Olá, como posso ajudar você hoje?',
+                extractedCustomerInfo: parsed.extractedCustomerInfo || {},
+                inferredAttributes: parsed.inferredAttributes || {
+                  communication_style: "breve",
+                  budget: "alto_padrao",
+                  urgency: "media",
+                  evidence: "Conversa com assistente"
+                },
+                suggestedPropertyIds: Array.isArray(parsed.suggestedPropertyIds) ? parsed.suggestedPropertyIds : []
+              };
+              break;
+            }
           }
-          
-          const parsed = JSON.parse(content);
-          if (parsed && (parsed.reply || parsed.message || parsed.text)) {
-            console.log(`=== [TRACE 4/4 SUCCESS] Resposta obtida com sucesso via ${modelId}! ===`);
-            successResponse = {
-              reply: parsed.reply || parsed.message || parsed.text || 'Olá, como posso ajudar você hoje?',
-              extractedCustomerInfo: parsed.extractedCustomerInfo || {},
-              inferredAttributes: parsed.inferredAttributes || {
-                communication_style: "breve",
-                budget: "alto_padrao",
-                urgency: "media",
-                evidence: "Conversa com assistente"
-              },
-              suggestedPropertyIds: Array.isArray(parsed.suggestedPropertyIds) ? parsed.suggestedPropertyIds : []
-            };
-            break;
-          }
+        } catch (orModelError: any) {
+          console.warn(`=== [TRACE MODEL FAIL] Modelo ${modelId} falhou. Erro: ${orModelError.message} ===`);
         }
-      } catch (orModelError: any) {
-        console.warn(`=== [TRACE MODEL FAIL] Modelo ${modelId} falhou. Erro: ${orModelError.message} ===`);
       }
     }
 
@@ -327,28 +405,55 @@ app.post('/api/grounding', async (req, res) => {
   try {
     const { query, city } = req.body;
     
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: `Procure atrações turísticas, praias, clubes de praia, mercados orgânicos ou restaurantes reais em ${city}, Bahia, Brasil sobre o tema: "${query}". Diga o nome da atração, uma descrição breve de 1 parágrafo, as coordenadas geográficas (latitude e longitude) aproximadas para renderizarmos no mapa, e uma dica local.`,
-      config: {
-        tools: [{ googleMaps: {} }],
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              description: { type: Type.STRING },
-              latitude: { type: Type.NUMBER },
-              longitude: { type: Type.NUMBER },
-              localTip: { type: Type.STRING }
-            },
-            required: ['name', 'description', 'latitude', 'longitude']
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model: 'gemini-3.6-flash',
+        contents: `Procure atrações turísticas, praias, clubes de praia, mercados orgânicos ou restaurantes reais em ${city}, Bahia, Brasil sobre o tema: "${query}". Diga o nome da atração, uma descrição breve de 1 parágrafo, as coordenadas geográficas (latitude e longitude) aproximadas para renderizarmos no mapa, e uma dica local.`,
+        config: {
+          tools: [{ googleMaps: {} }],
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                name: { type: Type.STRING },
+                description: { type: Type.STRING },
+                latitude: { type: Type.NUMBER },
+                longitude: { type: Type.NUMBER },
+                localTip: { type: Type.STRING }
+              },
+              required: ['name', 'description', 'latitude', 'longitude']
+            }
           }
         }
-      }
-    });
+      });
+    } catch (e) {
+      console.warn('Grounding 3.6-flash failed, trying 3.1-flash-lite:', e);
+      response = await ai.models.generateContent({
+        model: 'gemini-3.1-flash-lite',
+        contents: `Procure atrações turísticas, praias, clubes de praia, mercados orgânicos ou restaurantes reais em ${city}, Bahia, Brasil sobre o tema: "${query}". Diga o nome da atração, uma descrição breve de 1 parágrafo, as coordenadas geográficas (latitude e longitude) aproximadas para renderizarmos no mapa, e uma dica local.`,
+        config: {
+          tools: [{ googleMaps: {} }],
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                name: { type: Type.STRING },
+                description: { type: Type.STRING },
+                latitude: { type: Type.NUMBER },
+                longitude: { type: Type.NUMBER },
+                localTip: { type: Type.STRING }
+              },
+              required: ['name', 'description', 'latitude', 'longitude']
+            }
+          }
+        }
+      });
+    }
 
     const result = JSON.parse(response.text || '[]');
     res.json(result);
