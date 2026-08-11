@@ -175,6 +175,17 @@ export default function Chatbot({
     }
   };
 
+  const stopAudioPlayback = () => {
+    if (currentSourceRef.current) {
+      try { currentSourceRef.current.stop(); } catch (err) {}
+      currentSourceRef.current = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setPlayingAudioMsgId(null);
+  };
+
   const [isVoiceInputMode, setIsVoiceInputMode] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recognitionRef = useRef<any>(null);
@@ -183,6 +194,7 @@ export default function Chatbot({
   const maxTimerRef = useRef<any>(null);
   const intervalRef = useRef<any>(null);
   const isSubmittingRef = useRef<boolean>(false);
+  const hasPendingConsecutiveMsgRef = useRef<boolean>(false);
 
   const stopAndClearTimers = () => {
     if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null; }
@@ -190,12 +202,13 @@ export default function Chatbot({
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
   };
 
-  // Chat submission logic with memory persistence and duplicate submission guard
+  // Chat submission logic with memory persistence, audio interruption & consecutive message queueing
   const handleSendMessage = async (textToSend: string, isFromVoice: boolean = false) => {
     const trimmed = textToSend.trim();
-    if (!trimmed || isAiLoading || isSubmittingRef.current) return;
+    if (!trimmed) return;
 
-    isSubmittingRef.current = true;
+    // Immediately stop any playing audio when user sends/speaks a new message
+    stopAudioPlayback();
     stopAndClearTimers();
 
     const userMsg: Message = {
@@ -206,115 +219,147 @@ export default function Chatbot({
       createdAt: new Date().toISOString()
     };
 
+    // Always render the user's message in the UI immediately
     setMessages(prev => [...prev, userMsg]);
     setInputMessage('');
+
+    // If an AI request is already in progress, mark pending and do not duplicate parallel calls
+    if (isAiLoading || isSubmittingRef.current) {
+      hasPendingConsecutiveMsgRef.current = true;
+      return;
+    }
+
+    isSubmittingRef.current = true;
     setIsAiLoading(true);
 
-    const stages = [
-      'Analisando intenção e regras LGPD...',
-      'Recuperando memória salva do cliente...',
-      'Filtrando imóveis disponíveis em Bahia...',
-      'Extraindo preferências e atualizando CRM...'
-    ];
+    const processApiCall = async () => {
+      const stages = [
+        'Analisando intenção e regras LGPD...',
+        'Recuperando memória salva do cliente...',
+        'Filtrando imóveis disponíveis em Bahia...',
+        'Extraindo preferências e atualizando CRM...'
+      ];
 
-    let stageIdx = 0;
-    setActiveCognitiveStage(stages[0]);
-    const stageInterval = setInterval(() => {
-      stageIdx++;
-      if (stageIdx < stages.length) {
-        setActiveCognitiveStage(stages[stageIdx]);
-      } else {
-        clearInterval(stageInterval);
-      }
-    }, 1100);
-
-    try {
-      const chatHistory = messages
-        .filter(m => m.id !== 'welcome' && m.id !== 'lgpd-log')
-        .map(m => ({
-          role: m.sender === 'client' ? 'client' : 'agent',
-          text: m.text
-        }));
-      chatHistory.push({ role: 'client', text: trimmed });
-
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: chatHistory,
-          systemInstruction: agentInstruction,
-          properties: properties,
-          customerProfile: customerProfile
-        })
-      });
-
-      const data = await response.json();
-      clearInterval(stageInterval);
-      setActiveCognitiveStage(null);
-
-      if (data.reply) {
-        // Automatic Customer Profile Memory Persistence
-        if (data.extractedCustomerInfo && onUpdateCustomerProfile) {
-          onUpdateCustomerProfile(data.extractedCustomerInfo);
+      let stageIdx = 0;
+      setActiveCognitiveStage(stages[0]);
+      const stageInterval = setInterval(() => {
+        stageIdx++;
+        if (stageIdx < stages.length) {
+          setActiveCognitiveStage(stages[stageIdx]);
+        } else {
+          clearInterval(stageInterval);
         }
+      }, 1100);
 
-        // Record cognitive inferences
-        if (data.inferredAttributes) {
-          const inf = data.inferredAttributes;
-          Object.keys(inf).forEach(key => {
-            if (key !== 'evidence' && inf[key]) {
-              onAddInference({
-                id: 'inf-' + Math.random().toString(36).substr(2, 9),
-                customerId: 'cust-1',
-                attribute: key,
-                value: inf[key],
-                confidence: 0.90,
-                evidence: inf.evidence || 'Conversa com Maysa IA.',
-                updatedAt: new Date().toISOString()
-              });
+      try {
+        // Fetch current complete messages state
+        setMessages(currentMessages => {
+          const chatHistory = currentMessages
+            .filter(m => m.id !== 'welcome' && m.id !== 'lgpd-log')
+            .map(m => ({
+              role: m.sender === 'client' ? 'client' : 'agent',
+              text: m.text
+            }));
+
+          fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: chatHistory,
+              systemInstruction: agentInstruction,
+              properties: properties,
+              customerProfile: customerProfile
+            })
+          })
+          .then(res => res.json())
+          .then(data => {
+            clearInterval(stageInterval);
+            setActiveCognitiveStage(null);
+
+            if (data.reply) {
+              if (data.extractedCustomerInfo && onUpdateCustomerProfile) {
+                onUpdateCustomerProfile(data.extractedCustomerInfo);
+              }
+
+              if (data.inferredAttributes) {
+                const inf = data.inferredAttributes;
+                Object.keys(inf).forEach(key => {
+                  if (key !== 'evidence' && inf[key]) {
+                    onAddInference({
+                      id: 'inf-' + Math.random().toString(36).substr(2, 9),
+                      customerId: 'cust-1',
+                      attribute: key,
+                      value: inf[key],
+                      confidence: 0.90,
+                      evidence: inf.evidence || 'Conversa com Maysa IA.',
+                      updatedAt: new Date().toISOString()
+                    });
+                  }
+                });
+              }
+
+              const modelMsg: Message = {
+                id: 'msg-ai-' + Date.now(),
+                conversationId: 'active-conv',
+                sender: 'agent',
+                text: data.reply,
+                suggestedProperties: data.suggestedPropertyIds || [],
+                createdAt: new Date().toISOString()
+              };
+              setMessages(prev => [...prev, modelMsg]);
+
+              if (isFromVoice || isVoiceInputMode) {
+                speakMessage(modelMsg.id, data.reply);
+                setIsVoiceInputMode(false);
+              }
+            }
+          })
+          .catch(e => {
+            clearInterval(stageInterval);
+            setActiveCognitiveStage(null);
+            setMessages(prev => [
+              ...prev,
+              {
+                id: 'msg-error-' + Date.now(),
+                conversationId: 'active-conv',
+                sender: 'agent',
+                text: 'Maysa está temporariamente sem sinal em Trancoso. Por favor, tente novamente em instantes!',
+                createdAt: new Date().toISOString()
+              }
+            ]);
+          })
+          .finally(() => {
+            setIsAiLoading(false);
+            setIsRecording(false);
+            isSubmittingRef.current = false;
+
+            // If user sent another message while waiting, process it now with updated history!
+            if (hasPendingConsecutiveMsgRef.current) {
+              hasPendingConsecutiveMsgRef.current = false;
+              setTimeout(() => {
+                handleSendMessage('', false);
+              }, 300);
             }
           });
-        }
 
-        const modelMsg: Message = {
-          id: 'msg-ai-' + Date.now(),
-          conversationId: 'active-conv',
-          sender: 'agent',
-          text: data.reply,
-          suggestedProperties: data.suggestedPropertyIds || [],
-          createdAt: new Date().toISOString()
-        };
-        setMessages(prev => [...prev, modelMsg]);
-
-        // Automatically play voice response if the user sent message via microphone!
-        if (isFromVoice || isVoiceInputMode) {
-          speakMessage(modelMsg.id, data.reply);
-          setIsVoiceInputMode(false);
-        }
+          return currentMessages;
+        });
+      } catch (err) {
+        clearInterval(stageInterval);
+        setIsAiLoading(false);
+        isSubmittingRef.current = false;
       }
-    } catch (e) {
-      clearInterval(stageInterval);
-      setActiveCognitiveStage(null);
-      setMessages(prev => [
-        ...prev,
-        {
-          id: 'msg-error-' + Date.now(),
-          conversationId: 'active-conv',
-          sender: 'agent',
-          text: 'Maysa está temporariamente sem sinal em Trancoso. Por favor, tente novamente em instantes!',
-          createdAt: new Date().toISOString()
-        }
-      ]);
-    } finally {
-      setIsAiLoading(false);
-      setIsRecording(false);
-      isSubmittingRef.current = false;
-    }
+    };
+
+    processApiCall();
   };
 
   // Real Web Speech Recognition (Microphone STT - 60 Seconds Max Duration Support)
   const handleVoiceNoteClick = () => {
     if (!lgpdAccepted) return;
+
+    // Instantly interrupt any playing audio from Maysa
+    stopAudioPlayback();
 
     if (isRecording) {
       stopAndClearTimers();
