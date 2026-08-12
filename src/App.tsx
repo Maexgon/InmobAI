@@ -35,8 +35,11 @@ import {
 } from 'lucide-react';
 
 export default function App() {
+  // Check if URL is /mobile
+  const isMobilePath = typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('/mobile');
+
   // Global App States
-  const [currentTab, setCurrentTab] = useState('client-portal');
+  const [currentTab, setCurrentTab] = useState(isMobilePath ? 'android-app' : 'client-portal');
   const [userRole, setUserRole] = useState<'admin' | 'seller' | 'owner' | 'client'>('client');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
@@ -260,7 +263,7 @@ export default function App() {
     );
   }
 
-  if (currentTab === 'android-app') {
+  if (currentTab === 'android-app' || isMobilePath) {
     return (
       <MobileApp
         properties={properties}
@@ -271,7 +274,13 @@ export default function App() {
         onAddInference={handleAddInference}
         customerProfile={customers[0]}
         onUpdateCustomerProfile={handleUpdateCustomerProfile}
-        onSwitchToDesktop={() => setCurrentTab('client-portal')}
+        onSwitchToDesktop={() => {
+          if (typeof window !== 'undefined' && window.location.pathname.includes('/mobile')) {
+            window.location.href = '/';
+          } else {
+            setCurrentTab('client-portal');
+          }
+        }}
       />
     );
   }
