@@ -79,29 +79,14 @@ export default function Chatbot({
     ]);
   };
 
-  // Convert text to speech using gemini-3.1-flash-tts-preview with robust WAV audio decoding
+  // Convert text to speech using gemini-3.1-flash-tts-preview with robust WAV audio decoding and multilingual support
   const speakMessage = async (msgId: string, text: string) => {
     if (playingAudioMsgId === msgId) {
-      setPlayingAudioMsgId(null);
-      if (currentSourceRef.current) {
-        try { currentSourceRef.current.stop(); } catch (err) {}
-        currentSourceRef.current = null;
-      }
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
+      stopAudioPlayback();
       return;
     }
 
-    // Stop previous audio playback
-    if (currentSourceRef.current) {
-      try { currentSourceRef.current.stop(); } catch (err) {}
-      currentSourceRef.current = null;
-    }
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-
+    stopAudioPlayback();
     setPlayingAudioMsgId(msgId);
 
     try {
@@ -110,46 +95,26 @@ export default function Chatbot({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text })
       });
-      
-      if (!response.ok) {
-        throw new Error(`TTS API returned status ${response.status}`);
-      }
 
-      const data = await response.json();
-      
-      if (data.audio) {
-        // Decode base64 to binary ArrayBuffer
-        const binaryString = atob(data.audio);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
+      if (response.ok) {
+        const audioBlob = await response.blob();
+        const arrayBuffer = await audioBlob.arrayBuffer();
 
         if (!audioContextRef.current) {
-          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-          audioContextRef.current = new AudioContextClass();
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
         }
         
-        // Ensure AudioContext is resumed if browser auto-suspended
         if (audioContextRef.current.state === 'suspended') {
           await audioContextRef.current.resume();
         }
 
-        const audioBuffer = await audioContextRef.current.decodeAudioData(bytes.buffer);
+        const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
         const source = audioContextRef.current.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(audioContextRef.current.destination);
-        
-        currentSourceRef.current = source;
+        source.onended = () => setPlayingAudioMsgId(null);
         source.start(0);
-
-        source.onended = () => {
-          if (currentSourceRef.current === source) {
-            setPlayingAudioMsgId(null);
-            currentSourceRef.current = null;
-          }
-        };
+        currentSourceRef.current = source;
       } else {
         throw new Error('No audio returned from server');
       }
@@ -161,8 +126,12 @@ export default function Chatbot({
           window.speechSynthesis.cancel();
           const cleanText = text.replace(/[*#_\[\]()]/g, '');
           const utterance = new SpeechSynthesisUtterance(cleanText);
-          const hasSpanish = /[áéíóúñ¿¡]/.test(text) || text.toLowerCase().includes('hola');
-          utterance.lang = hasSpanish ? 'es-ES' : 'pt-BR';
+
+          // Detect language from text content
+          const isSpanish = /[áéíóúñ¿¡]/i.test(text) || /\b(hola|gracias|casa|alquiler|reserva|precio|viaje|buenas|tardes|noches)\b/i.test(text);
+          const isEnglish = /\b(hello|hi|thanks|house|rent|booking|price|trip|good|morning|afternoon)\b/i.test(text);
+
+          utterance.lang = isSpanish ? 'es-ES' : isEnglish ? 'en-US' : selectedLang;
           utterance.onend = () => setPlayingAudioMsgId(null);
           utterance.onerror = () => setPlayingAudioMsgId(null);
           window.speechSynthesis.speak(utterance);
@@ -379,7 +348,7 @@ export default function Chatbot({
       stopAndClearTimers();
 
       const recognition = new SpeechRecognition();
-      recognition.lang = 'pt-BR';
+      recognition.lang = selectedLang;
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
@@ -660,50 +629,101 @@ export default function Chatbot({
 
       {/* 4. FOOTER & INPUT CONTROLS */}
       {lgpdAccepted && (
-        <div className="p-4 bg-white border-t border-slate-200/80 flex items-center gap-3 relative z-10">
-          {/* Real Mic button */}
-          <button 
-            onClick={handleVoiceNoteClick}
-            className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 border ${
-              isRecording 
-                ? 'bg-red-500 border-red-500 text-white animate-pulse shadow-lg shadow-red-500/20' 
-                : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
-            }`}
-            title="Falar por Voz (Reconhecimento de Voz real)"
-          >
-            <Mic className="w-5 h-5" />
-          </button>
-
-          {/* Voice active animation banner overlay */}
-          {isRecording ? (
-            <div className="flex-1 flex items-center gap-3 px-3 text-red-500 text-xs font-semibold">
-              <span className="flex gap-1">
-                <span className="w-1.5 h-3.5 bg-red-500 rounded animate-bounce"></span>
-                <span className="w-1.5 h-5 bg-red-500 rounded animate-bounce [animation-delay:0.2s]"></span>
-                <span className="w-1.5 h-2 bg-red-500 rounded animate-bounce [animation-delay:0.4s]"></span>
-              </span>
-              <span>Gravando voz... ({recordingSeconds}s / 60s max) - Fale agora com a Maysa!</span>
+        <div className="p-3 bg-white border-t border-slate-200/80 flex flex-col gap-2 relative z-10">
+          
+          {/* Language Selector Bar (ES / PT / EN) */}
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Idioma de Voz & Chat:</span>
+            <div className="flex items-center gap-1.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setSelectedLang('es-ES')}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
+                  selectedLang === 'es-ES' 
+                    ? 'bg-emerald-500 text-white shadow-sm' 
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🇪🇸 ES
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedLang('pt-BR')}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
+                  selectedLang === 'pt-BR' 
+                    ? 'bg-emerald-500 text-white shadow-sm' 
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🇵🇹 PT
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedLang('en-US')}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
+                  selectedLang === 'en-US' 
+                    ? 'bg-emerald-500 text-white shadow-sm' 
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🇺🇸 EN
+              </button>
             </div>
-          ) : (
-            <input 
-              type="text" 
-              placeholder="Pergunte à Maysa (Ex: Quero uma casa em Trancoso...)"
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSendMessage(inputMessage);
-              }}
-              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs focus:outline-none focus:ring-1 focus:ring-[#10B981]"
-            />
-          )}
+          </div>
 
-          <button 
-            onClick={() => handleSendMessage(inputMessage)}
-            disabled={!inputMessage.trim() && !isRecording}
-            className="w-11 h-11 rounded-xl bg-[#111827] text-white flex items-center justify-center hover:bg-slate-800 disabled:opacity-40 transition-colors"
-          >
-            <Send className="w-4.5 h-4.5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Real Mic button */}
+            <button 
+              type="button"
+              onClick={handleVoiceNoteClick}
+              className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 border flex-shrink-0 ${
+                isRecording 
+                  ? 'bg-red-500 border-red-500 text-white animate-pulse shadow-lg shadow-red-500/20' 
+                  : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+              }`}
+              title="Falar por Voz (Reconhecimento de Voz real)"
+            >
+              <Mic className="w-5 h-5" />
+            </button>
+
+            {/* Voice active animation banner overlay */}
+            {isRecording ? (
+              <div className="flex-1 flex items-center gap-3 px-3 text-red-500 text-xs font-semibold bg-red-50/50 py-2.5 rounded-xl border border-red-200">
+                <span className="flex gap-1">
+                  <span className="w-1.5 h-3.5 bg-red-500 rounded animate-bounce"></span>
+                  <span className="w-1.5 h-5 bg-red-500 rounded animate-bounce [animation-delay:0.2s]"></span>
+                  <span className="w-1.5 h-2 bg-red-500 rounded animate-bounce [animation-delay:0.4s]"></span>
+                </span>
+                <span className="text-[11px]">Gravando voz ({selectedLang.split('-')[0].toUpperCase()})... ({recordingSeconds}s / 60s max)</span>
+              </div>
+            ) : (
+              <input 
+                type="text" 
+                placeholder={
+                  selectedLang === 'es-ES' 
+                    ? "Escribe a Maysa (Ej: Quiero alquilar una casa en Trancoso...)" 
+                    : selectedLang === 'en-US' 
+                    ? "Ask Maysa (e.g. I want to rent a villa in Trancoso...)" 
+                    : "Pergunte à Maysa (Ex: Quero uma casa em Trancoso...)"
+                }
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSendMessage(inputMessage);
+                }}
+                className="flex-1 bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 rounded-xl px-4 py-3 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
+              />
+            )}
+
+            <button 
+              type="button"
+              onClick={() => handleSendMessage(inputMessage)}
+              disabled={!inputMessage.trim() && !isRecording}
+              className="w-11 h-11 rounded-xl bg-[#111827] text-white flex items-center justify-center hover:bg-slate-800 disabled:opacity-40 transition-colors flex-shrink-0"
+            >
+              <Send className="w-4.5 h-4.5" />
+            </button>
+          </div>
         </div>
       )}
 
