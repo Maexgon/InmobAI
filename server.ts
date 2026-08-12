@@ -488,8 +488,8 @@ app.post('/api/tts', async (req, res) => {
     const [response] = await ttsClient.synthesizeSpeech(request);
     
     if (response.audioContent) {
-      const base64Audio = Buffer.from(response.audioContent).toString('base64');
-      return res.json({ audio: base64Audio, format: 'audio/mpeg' });
+      res.set('Content-Type', 'audio/mpeg');
+      return res.send(Buffer.from(response.audioContent));
     } else {
       console.warn('Google Cloud TTS API falhou: sem conteudo de audio');
       return res.status(404).json({ error: 'Nenhum provedor de TTS premium disponível no momento' });
