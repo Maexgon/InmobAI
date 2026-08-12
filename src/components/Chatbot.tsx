@@ -43,7 +43,7 @@ export default function Chatbot({
   ]);
 
   const [inputMessage, setInputMessage] = useState('');
-  const [lgpdAccepted, setLgpdAccepted] = useState(false);
+  const [lgpdAccepted, setLgpdAccepted] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [activeCognitiveStage, setActiveCognitiveStage] = useState<string | null>(null);
@@ -59,24 +59,18 @@ export default function Chatbot({
   const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto scroll to bottom
+  // Safe Auto scroll to bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    try {
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      });
+    } catch (e) {}
   }, [messages, isAiLoading, activeCognitiveStage]);
 
   // Handle LGPD Consent
   const acceptLgpd = () => {
     setLgpdAccepted(true);
-    setMessages(prev => [
-      ...prev,
-      {
-        id: 'lgpd-log',
-        conversationId: 'active-conv',
-        sender: 'agent',
-        text: `✓ Consentimento LGPD registrado com sucesso em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}. Como posso ajudar você hoje? Procure por vilas ou peça recomendações!`,
-        createdAt: new Date().toISOString()
-      }
-    ]);
   };
 
   // Convert text to speech using gemini-3.1-flash-tts-preview with robust WAV audio decoding and multilingual support
@@ -604,32 +598,8 @@ export default function Chatbot({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 3. EXPLICIT LGPD CONSENT POPUP */}
-      {!lgpdAccepted && (
-        <div className="absolute inset-x-0 bottom-0 bg-slate-950/95 backdrop-blur-sm p-6 text-white border-t border-slate-800 space-y-4 animate-slide-up z-30">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="w-8 h-8 text-[#10B981] mt-0.5 flex-shrink-0" />
-            <div>
-              <h4 className="font-bold text-sm font-display">Lei Geral de Proteção de Dados (LGPD)</h4>
-              <p className="text-[11px] text-slate-400 leading-relaxed mt-1.5">
-                Para podermos auxiliar você com cotações e recomendações personalizadas, precisamos coletar informações básicas fornecidas durante nossa conversa (como datas, composição familiar e preferências de turismo). Seus dados serão mantidos seguros de forma privada.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <button 
-              onClick={acceptLgpd}
-              className="bg-[#10B981] text-[#111827] font-extrabold text-xs px-4 py-2 rounded-xl hover:bg-[#059669] transition-colors shadow-lg shadow-[#10B981]/15"
-            >
-              Aceitar e Continuar
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* 4. FOOTER & INPUT CONTROLS */}
-      {lgpdAccepted && (
-        <div className="p-3 bg-white border-t border-slate-200/80 flex flex-col gap-2 relative z-10">
+      <div className="p-3 bg-white border-t border-slate-200/80 flex flex-col gap-2 relative z-10">
           
           {/* Language Selector Bar (ES / PT / EN) */}
           <div className="flex items-center justify-between px-1">
@@ -725,7 +695,6 @@ export default function Chatbot({
             </button>
           </div>
         </div>
-      )}
 
       {/* Booking Modal */}
       {bookingModalProp && (
