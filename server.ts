@@ -320,7 +320,7 @@ REGRAS RÍGIDAS DE SEQUÊNCIA:
    - Passo 6: Orçamento diário por noite (SOMENTE PERGUNTAR AQUI POR ÚLTIMO!).
    - Passo 7: Sugerir imóveis (suggestedPropertyIds) APENAS APÓS completar todos os passos de 1 a 6.
 5. Se não houver vaga: "Que pena. No momento não tenho outra opção disponível, mas quer que anotemos seus dados e entremos em contato novamente caso surja alguma vaga para essas datas?"
-6. Respostas curtas (máximo 2 a 3 linhas).`;
+6. Respostas curtas (máximo 2 a 3 linhas).
 
 Retorne JSON:
 {
