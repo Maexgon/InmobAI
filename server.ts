@@ -139,10 +139,9 @@ Você deve responder rigorosamente no formato JSON especificado.
     console.log('=== [TRACE 2/4] Enviando solicitação para Gemini Primário... ===');
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-2.5-flash',
       contents: formattedHistory.length > 0 ? formattedHistory : [{ role: 'user', parts: [{ text: 'Olá' }] }],
       config: {
-        tools: [{ googleMaps: {} }],
         systemInstruction: chatInstruction,
         responseMimeType: 'application/json',
         responseSchema: {
@@ -215,10 +214,9 @@ Você deve responder rigorosamente no formato JSON especificado.
     try {
       console.log('=== [TRACE FALLBACK] Tentando modelo Gemini Alternativo (gemini-3.1-flash-lite)... ===');
       const fallbackResponse = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite',
+        model: 'gemini-2.0-flash-lite',
         contents: formattedHistory.length > 0 ? formattedHistory : [{ role: 'user', parts: [{ text: 'Olá' }] }],
         config: {
-          tools: [{ googleMaps: {} }],
           systemInstruction: chatInstruction,
           responseMimeType: 'application/json',
           responseSchema: {
