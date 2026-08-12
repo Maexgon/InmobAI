@@ -263,7 +263,7 @@ export default function App() {
     );
   }
 
-  if (currentTab === 'android-app' || isMobilePath) {
+  if (currentTab === 'android-app' || currentTab === 'maysa-chat' || currentTab === 'client-mobile' || isMobilePath) {
     return (
       <MobileApp
         properties={properties}

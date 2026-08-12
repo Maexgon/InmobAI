@@ -101,9 +101,9 @@ export default function MobileApp({
         </header>
 
         {/* Main Content Area (Tab Views) */}
-        <main className="flex-1 overflow-y-auto relative bg-slate-950">
+        <main className="flex-1 flex flex-col min-h-0 relative bg-slate-950">
           {activeTab === 'chat' && (
-            <div className="h-full">
+            <div className="flex-1 flex flex-col min-h-0 h-full">
               <Chatbot
                 properties={properties}
                 agentName={agentName}
