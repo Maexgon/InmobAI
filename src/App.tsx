@@ -45,7 +45,17 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
   // Firestore & local states
-  const [companyConfig, setCompanyConfig] = useState<CompanyConfig | null>(null);
+  const [companyConfig, setCompanyConfig] = useState<CompanyConfig>({
+    name: 'InmobAI',
+    logo: 'https://raw.githubusercontent.com/google/material-design-icons/master/png/action/home/white_24dp.png',
+    primaryColor: '#111827',
+    email: 'contato@inmobai.com.br',
+    phone: '+55 (73) 99981-2026',
+    address: 'Quadrado Histórico, 10 - Trancoso, Porto Seguro - BA',
+    agentName: 'Maysa',
+    agentAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
+    agentInstruction: 'Você é Maysa, Concierge de luxo...'
+  });
   const [properties, setProperties] = useState<Property[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
