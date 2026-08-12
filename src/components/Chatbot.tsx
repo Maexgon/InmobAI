@@ -43,6 +43,7 @@ export default function Chatbot({
   ]);
 
   const [inputMessage, setInputMessage] = useState('');
+  const [selectedLang, setSelectedLang] = useState<'es-ES' | 'pt-BR' | 'en-US'>('es-ES');
   const [lgpdAccepted, setLgpdAccepted] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
