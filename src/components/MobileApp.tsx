@@ -45,10 +45,10 @@ export default function MobileApp({
   }, []);
 
   return (
-    <div className="fixed inset-0 bg-slate-950 flex items-center justify-center p-0 md:p-6 font-sans text-slate-100 select-none overflow-hidden">
+    <div className="w-full h-full min-h-[600px] bg-slate-950 flex items-center justify-center p-2 md:p-6 font-sans text-slate-100 select-none overflow-hidden">
       
       {/* Smartphone Frame Container */}
-      <div className="w-full h-full md:max-w-[410px] md:max-h-[850px] bg-slate-900 md:border-[12px] border-slate-800 md:rounded-[3rem] shadow-2xl flex flex-col relative overflow-hidden">
+      <div className="w-full h-full max-w-[420px] max-h-[860px] bg-slate-900 md:border-[10px] border-slate-800 rounded-[2.5rem] shadow-2xl flex flex-col relative overflow-hidden my-auto">
         
         {/* Android Speaker Slot (Only visible on desktop view) */}
         <div className="hidden md:flex absolute top-0 inset-x-0 h-5 bg-slate-900 items-center justify-center z-50">
