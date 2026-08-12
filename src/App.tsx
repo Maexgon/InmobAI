@@ -263,7 +263,8 @@ export default function App() {
     );
   }
 
-  if (currentTab === 'android-app' || currentTab === 'maysa-chat' || currentTab === 'client-mobile' || isMobilePath) {
+  // Standalone standalone route /mobile
+  if (isMobilePath) {
     return (
       <MobileApp
         properties={properties}
@@ -274,13 +275,7 @@ export default function App() {
         onAddInference={handleAddInference}
         customerProfile={customers[0]}
         onUpdateCustomerProfile={handleUpdateCustomerProfile}
-        onSwitchToDesktop={() => {
-          if (typeof window !== 'undefined' && window.location.pathname.includes('/mobile')) {
-            window.location.href = '/';
-          } else {
-            setCurrentTab('client-portal');
-          }
-        }}
+        onSwitchToDesktop={() => { window.location.href = '/'; }}
       />
     );
   }
@@ -383,7 +378,22 @@ export default function App() {
                 />
               )}
 
-              {/* CLIENT MOBILE VIEW */}
+              {/* ANDROID APP & MAYSA CHAT MOBILE VIEWS */}
+              {(currentTab === 'android-app' || currentTab === 'maysa-chat') && (
+                <div className="h-[800px] w-full flex items-center justify-center relative py-2">
+                  <MobileApp
+                    properties={properties}
+                    agentName={companyConfig.agentName}
+                    agentAvatar={companyConfig.agentAvatar}
+                    agentInstruction={companyConfig.agentInstruction}
+                    onBookProperty={handleBookProperty}
+                    onAddInference={handleAddInference}
+                    customerProfile={customers[0]}
+                    onUpdateCustomerProfile={handleUpdateCustomerProfile}
+                    onSwitchToDesktop={() => setCurrentTab('client-portal')}
+                  />
+                </div>
+              )}
               {currentTab === 'client-mobile' && (
                 <ClientMobileView 
                   properties={properties}
